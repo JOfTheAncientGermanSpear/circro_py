@@ -16,35 +16,40 @@ def _read_node_file(filename):
     df = read_csv(filename, header=None)
     return concat([df[0], df[1]], keys=['left', 'right']).to_frame()
 
+def _create_nodes_df(filename_dict):
+    node_file_keys = ['labels', 'sizes', 'colors']
+    node_dfs = {k: _read_node_file(f) for k,f in filename_dict.items() 
+            if f and k in node_file_keys}
+    for k, df in node_dfs.items():
+        df.columns = [k[:-1]] 
+    return concat(list(node_dfs.values()), axis = 1)
+
+def _create_edges_df(edge_file, labels, nodes):
+    edges = read_csv(edge_file, header=None)
+    if labels:
+        labels = nodes['label']
+        if 'edges' in res:
+            edges.columns = labels.values
+            edges.index = labels.values
+    return edges
+
+
 def make_circro(labels = None, sizes = None, colors = None, edge_matrix = None):
-    data_filenames = _inputs_to_dict(labels = labels, sizes = sizes, 
+    inputs = _inputs_to_dict(labels = labels, sizes = sizes, 
             colors = colors, edge_matrix = edge_matrix)
 
     file_keys = ['labels', 'sizes', 'colors', 'edge_matrix']
 
-    res = {}
 
-    if not any(f in data_filenames for f in file_keys):
+    if not any(f in inputs for f in file_keys):
         raise InputError("at least one of {} inputs must be set".format(file_keys))
 
-    node_dfs = {k: _read_node_file(f) 
-            for k,f in data_filenames.items() if f and 'edge' not in k}
-
-    for k, df in node_dfs.items():
-        df.columns = [k[:-1]] 
-
-    res['nodes'] = concat(list(node_dfs.values()), axis = 1)
-
+    res = {}
+    res['nodes'] = _create_nodes_df(inputs) 
     if edge_matrix:
-        res['edges'] = read_csv(edge_matrix, header=None)
-
-    if labels:
-        labels = res['nodes']['label']
-        if 'edges' in res:
-            res['edges'].columns = labels.values
-            res['edges'].index = labels.values
-
+        res['edges'] = _create_edges_df(edge_matrix, labels, res['nodes'])
     return res
+
 
 def _get_draw_info(node, side, index, rad_per_node):
     res = {}
