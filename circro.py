@@ -1,9 +1,7 @@
+from __future__ import division
 from pandas import read_csv, concat, Series, DataFrame
 import numpy as np
 import matplotlib.pyplot as plt
-
-def _inputs_to_dict(**kwords):
-    return kwords
 
 class InputError(Exception):
     def __init__(self, msg):
@@ -11,10 +9,12 @@ class InputError(Exception):
     def __str__(self):
         return repr(self.msg)
 
+def _inputs_to_dict(**kwords):
+    return kwords
+
 def _read_node_file(filename):
     df = read_csv(filename, header=None)
     return concat([df[0], df[1]], keys=['left', 'right']).to_frame()
-
 
 def make_circro(labels = None, sizes = None, colors = None, edge_matrix = None):
     data_filenames = _inputs_to_dict(labels = labels, sizes = sizes, 
@@ -33,7 +33,6 @@ def make_circro(labels = None, sizes = None, colors = None, edge_matrix = None):
     for k, df in node_dfs.items():
         df.columns = [k[:-1]] 
 
-
     res['nodes'] = concat(list(node_dfs.values()), axis = 1)
 
     if edge_matrix:
@@ -41,7 +40,6 @@ def make_circro(labels = None, sizes = None, colors = None, edge_matrix = None):
 
     if labels:
         labels = res['nodes']['label']
-
         if 'edges' in res:
             res['edges'].columns = labels.values
             res['edges'].index = labels.values
