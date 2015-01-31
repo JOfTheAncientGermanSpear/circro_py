@@ -16,6 +16,7 @@ def _read_node_file(filename):
     df = read_csv(filename, header=None)
     return concat([df[0], df[1]], keys=['left', 'right']).to_frame()
 
+
 def _create_nodes_df(filename_dict):
     node_file_keys = ['labels', 'sizes', 'colors']
     node_dfs = {k: _read_node_file(f) for k,f in filename_dict.items() 
@@ -23,6 +24,7 @@ def _create_nodes_df(filename_dict):
     for k, df in node_dfs.items():
         df.columns = [k[:-1]] 
     return concat(list(node_dfs.values()), axis = 1)
+
 
 def _create_edges_df(edge_file, labels, nodes):
     edges = read_csv(edge_file, header=None)
@@ -34,7 +36,8 @@ def _create_edges_df(edge_file, labels, nodes):
     return edges
 
 
-def make_circro(labels = None, sizes = None, colors = None, edge_matrix = None):
+def make_circro(labels = None, sizes = None, colors = None, edge_matrix = None,
+        inner_r=1.0, start_radian=0.0, edge_threshold=.5):
     inputs = _inputs_to_dict(labels = labels, sizes = sizes, 
             colors = colors, edge_matrix = edge_matrix)
 
@@ -48,26 +51,38 @@ def make_circro(labels = None, sizes = None, colors = None, edge_matrix = None):
     res['nodes'] = _create_nodes_df(inputs) 
     if edge_matrix:
         res['edges'] = _create_edges_df(edge_matrix, labels, res['nodes'])
+
+    res['inner_r'] = inner_r;
+    res['start_radian'] = start_radian
+    res['edge_threshold'] = edge_threshold
+
+    num_nodes = len(res['nodes']) if 'nodes' in res else len(res['edges'])
+    rad_per_node = 2 * np.pi/num_nodes
+
+    res['nodes']['width'] = rad_per_node
+    res['nodes']['width'].right = rad_per_node * -1
+    res['nodes']['theta'] = res['nodes']['width'] * res['nodes'].index.labels[1]
+    res['nodes']['label_loc'] = res['nodes']['theta'] * 180/np.pi
+    res['nodes']['label_loc'].right = 360 + res['nodes']['label_loc'].right
+    deg_per_node = 180/np.pi * rad_per_node
+    res['nodes']['label_loc'].left = res['nodes']['label_loc'].left + deg_per_node/2
+    res['nodes']['label_loc'].right = res['nodes']['label_loc'].right - deg_per_node/2
+
     return res
 
 
-def _get_draw_info(node, side, index, rad_per_node):
-    res = {}
-    res['inner_r'] = 1.0
-    res['outer_r'] = res['inner_r'] + node['size'] if 'size' in node else .5
-    res['width'] = rad_per_node if side is 'right' else -1 * rad_per_node
-    res['theta'] = index * res['width']
-    return res
-
-def plot_circro(my_circ, inner_radius = 1):
-    ax = plt.subplot(111, polar = True)
+def plot_circro(my_circ):
     nodes = my_circ['nodes']
-    rad_per_node = 2 * np.pi/len(nodes)
+    start_radian = my_circ['start_radian']
+    inner_r = my_circ['inner_r']
+
+    ax = plt.subplot(111, polar = True)
+    plt.thetagrids(nodes['label_loc'], nodes['label'])
+    plt.grid(False, axis='y', which='both') #turn off radial lines
+    plt.grid(False, axis='x', which='minor') #turn off radial lines
+    ax.set_yticklabels([]) #turn off radial labels
 
     for (side, index), n in nodes.iterrows():
-        n = _get_draw_info(n, side, index, rad_per_node)
-        bar = ax.bar(n['theta'], n['outer_r'], width=n['width'], bottom = n['inner_r'])
-        if side is 'left':
-            bar[0].set_facecolor([1, 0, 0])
+        bar = ax.bar(n['theta'] + start_radian, n['size'], width=n['width'], bottom = inner_r)
 
     plt.show()
