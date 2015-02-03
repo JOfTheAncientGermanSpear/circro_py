@@ -105,7 +105,40 @@ def plot_circro(my_circ):
     plt.grid(False, axis='x', which='minor') #turn off radial lines
     ax.set_yticklabels([]) #turn off radial labels
 
-    for (side, index), n in nodes.iterrows():
-        bar = ax.bar(n['theta'], n['size'], width=n['width'], bottom = inner_r)
+    ax.bar(nodes['theta'], nodes['size'], nodes['width'], bottom = inner_r)
+
+
+    if 'edges' in my_circ:
+        edges = my_circ['edges']
+
+        connections = edges.copy()
+        connections[connections < my_circ['edge_threshold']] = 0
+
+        for startLabel in edges:
+            endEdges = edges[startLabel][:startLabel][:-1] #label slices are inclusive
+            startNode = nodes[nodes['label'] == startLabel]
+            startTheta = startNode['theta'][0]
+            for (endLabel, weight) in endEdges.iteritems():
+                if (weight > my_circ['edge_threshold']):
+                    endNode = nodes[nodes['label'] == endLabel]
+                    endTheta = endNode['theta'][0]
+                    (startTheta, endTheta) = np.sort([startTheta, endTheta])
+                    if endTheta - startTheta > np.pi:
+                        left = np.linspace(startTheta, 0, 5)
+                        right = np.linspace(2 * np.pi, endTheta, 5)
+                        thetas = np.concatenate([left, right])
+                    else:
+                        thetas = np.linspace(startTheta, endTheta, 10)
+                    thetaDist = np.minimum(abs(thetas - startTheta), abs(thetas - endTheta))
+                    print('weight')
+                    print(weight)
+                    print('edge threshold')
+                    print(my_circ['edge_threshold'])
+                    print('thetas')
+                    print(thetas)
+                    radii = np.abs(inner_r * np.cos(thetaDist))
+                    print('radii')
+                    print(radii)
+                    ax.plot(thetas, radii, 'o')
 
     plt.show()
