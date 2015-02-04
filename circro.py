@@ -114,29 +114,29 @@ def plot_circro(my_circ):
         connections = edges.copy()
         connections[connections < my_circ['edge_threshold']] = 0
 
-        for startLabel in edges:
-            endEdges = edges[startLabel][:startLabel][:-1] #label slices are inclusive
-            startNode = nodes[nodes['label'] == startLabel]
-            startTheta = startNode['theta'][0]
-            for (endLabel, weight) in endEdges.iteritems():
+        for start_label in edges:
+            end_edges = edges[start_label][:start_label][:-1] #label slices are inclusive
+            start_node = nodes[nodes['label'] == start_label]
+            start_theta = start_node['theta'][0]
+            for (end_label, weight) in end_edges.iteritems():
                 if (weight > my_circ['edge_threshold']):
-                    endNode = nodes[nodes['label'] == endLabel]
-                    endTheta = endNode['theta'][0]
-                    (startTheta, endTheta) = np.sort([startTheta, endTheta])
-                    if endTheta - startTheta > np.pi:
-                        left = np.linspace(startTheta, 0, 5)
-                        right = np.linspace(2 * np.pi, endTheta, 5)
+                    end_node = nodes[nodes['label'] == end_label]
+                    end_theta = end_node['theta'][0]
+                    (start_theta, end_theta) = np.sort([start_theta, end_theta])
+                    if end_theta - start_theta > np.pi:
+                        left = np.linspace(start_theta, 0, 5)
+                        right = np.linspace(2 * np.pi, end_theta, 5)
                         thetas = np.concatenate([left, right])
                     else:
-                        thetas = np.linspace(startTheta, endTheta, 10)
-                    thetaDist = np.minimum(abs(thetas - startTheta), abs(thetas - endTheta))
+                        thetas = np.linspace(start_theta, end_theta, 10)
+                    theta_dist = np.minimum(abs(thetas - start_theta), abs(thetas - end_theta))
                     print('weight')
                     print(weight)
                     print('edge threshold')
                     print(my_circ['edge_threshold'])
                     print('thetas')
                     print(thetas)
-                    radii = np.abs(inner_r * np.cos(thetaDist))
+                    radii = np.abs(inner_r * np.cos(theta_dist))
                     print('radii')
                     print(radii)
                     ax.plot(thetas, radii, 'o')
