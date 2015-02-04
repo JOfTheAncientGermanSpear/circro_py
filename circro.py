@@ -2,6 +2,7 @@ from __future__ import division
 from pandas import read_csv, concat, Series, DataFrame
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy import interpolate
 
 class InputError(Exception):
     def __init__(self, msg):
@@ -57,6 +58,28 @@ def make_circro(labels = None, sizes = None, colors = None, edge_matrix = None,
 
     return res
 
+def _calculate_radial_arc(theta_gap, radius):
+	if theta_gap > np.pi:
+		theta_gap = theta_gap - np.pi
+	
+	theta_mid = theta_gap/2
+
+	x_stop = np.cos(theta_gap)
+	y_stop = np.sin(theta_gap)
+	dist = np.linalg.norm([x_stop, y_stop])
+	elevation = radius - dist/2 if dist < 2 * radius else 0
+	x_mid = elevation * x_stop
+	y_mid = elevation * y_stop
+	xs = [1, x_mid, x_stop]
+	ys = [0, y_mid, y_stop]
+	x_fn = interpolate.interp1d([0, theta_mid, theta_gap], xs, kind = 'quadratic')
+	y_fn = interpolate.interp1d([0, theta_mid, theta_gap], ys, kind = 'quadratic')
+	theta_i = np.linspace(0, theta_gap, 20)
+
+	rs = np.linalg.norm([x_fn(theta_i), y_fn(theta_i)], axis = 0)
+
+	return (rs, theta_i)
+
 def _plot_info(circ):
     num_nodes = len(circ['nodes']) if 'nodes' in circ else len(circ['edges'])
     rad_per_node = 2 * np.pi/num_nodes
@@ -65,8 +88,8 @@ def _plot_info(circ):
     nodes = DataFrame()
 
     #get the index & main data fram circ
-    nodes['label'] = circ['nodes']['label']
-    nodes['size'] = circ['nodes']['size']
+    nodes['label'] = circ['nodes']['label'] if 'label' in circ['nodes'] else circ['nodes'].index.labels[1]
+    nodes['size'] = circ['nodes']['size'] if 'size' in circ['nodes'] else 1
 
     nodes['width'] = rad_per_node
     nodes['width'].right = rad_per_node * -1
@@ -117,28 +140,16 @@ def plot_circro(my_circ):
         for start_label in edges:
             end_edges = edges[start_label][:start_label][:-1] #label slices are inclusive
             start_node = nodes[nodes['label'] == start_label]
-            start_theta = start_node['theta'][0]
+            start_theta = np.deg2rad(start_node['label_loc'][0])
             for (end_label, weight) in end_edges.iteritems():
+                print('start label {s}, end label {e}'.format(s = start_label, e = end_label))
                 if (weight > my_circ['edge_threshold']):
+                    print('bout to add line')
                     end_node = nodes[nodes['label'] == end_label]
-                    end_theta = end_node['theta'][0]
+                    end_theta = np.deg2rad(end_node['label_loc'][0])
                     (start_theta, end_theta) = np.sort([start_theta, end_theta])
-                    if end_theta - start_theta > np.pi:
-                        left = np.linspace(start_theta, 0, 5)
-                        right = np.linspace(2 * np.pi, end_theta, 5)
-                        thetas = np.concatenate([left, right])
-                    else:
-                        thetas = np.linspace(start_theta, end_theta, 10)
-                    theta_dist = np.minimum(abs(thetas - start_theta), abs(thetas - end_theta))
-                    print('weight')
-                    print(weight)
-                    print('edge threshold')
-                    print(my_circ['edge_threshold'])
-                    print('thetas')
-                    print(thetas)
-                    radii = np.abs(inner_r * np.cos(theta_dist))
-                    print('radii')
-                    print(radii)
-                    ax.plot(thetas, radii, 'o')
+                    (radii, thetas) = _calculate_radial_arc(end_theta - start_theta, inner_r)
+                    thetas = thetas + start_theta
+                    ax.plot(thetas, radii)
 
     plt.show()
