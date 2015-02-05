@@ -58,7 +58,11 @@ def make_circro(labels = None, sizes = None, colors = None, edge_matrix = None,
 
     return res
 
-def _calculate_radial_arc(theta_gap, radius):
+def _calculate_radial_arc(start_radian, end_radian, radius):
+	def calc_gap():
+		return np.abs(end_radian - start_radian)
+
+	theta_gap = calc_gap()
 	if theta_gap > np.pi:
 		theta_gap = theta_gap - np.pi
 	
@@ -80,7 +84,7 @@ def _calculate_radial_arc(theta_gap, radius):
 	thetas = np.arctan2(hs, xs)
 	thetas = thetas - np.min(thetas)
 
-	return (rs * radius, thetas)
+	return (rs * radius, thetas + start_radian)
 
 def _plot_info(circ):
     num_nodes = len(circ['nodes']) if 'nodes' in circ else len(circ['edges'])
@@ -148,8 +152,7 @@ def plot_circro(my_circ):
                     end_node = nodes[nodes['label'] == end_label]
                     end_theta = np.deg2rad(end_node['label_loc'][0])
                     (start_theta, end_theta) = np.sort([start_theta, end_theta])
-                    (radii, thetas) = _calculate_radial_arc(end_theta - start_theta, inner_r)
-                    thetas = thetas + start_theta
+                    (radii, thetas) = _calculate_radial_arc(start_theta, end_theta, inner_r)
                     ax.plot(thetas, radii)
 
     plt.show()
