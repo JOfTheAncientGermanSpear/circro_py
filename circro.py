@@ -58,33 +58,37 @@ def make_circro(labels = None, sizes = None, colors = None, edge_matrix = None,
 
     return res
 
-def _calculate_radial_arc(start_radian, end_radian, radius):
-	def calc_gap():
-		return np.abs(end_radian - start_radian)
+def _calculate_radial_arc(start_radian, end_radian, radius): 
+    [start_radian, end_radian] = np.sort([start_radian, end_radian])
 
-	theta_gap = calc_gap()
-	if theta_gap > np.pi:
-		theta_gap = theta_gap - np.pi
+    theta_gap_orig = end_radian - start_radian
+
+    theta_gap =  theta_gap_orig if theta_gap_orig < np.pi else 2*np.pi - theta_gap_orig
 	
-	theta_mid = np.pi/2
-	theta_left = theta_mid - theta_gap/2
-	theta_right = theta_mid + theta_gap/2
-	thetas = [theta_left, theta_mid, theta_right]
+    theta_mid = np.pi/2
+    theta_left = theta_mid - theta_gap/2
+    theta_right = theta_mid + theta_gap/2
+    thetas = [theta_left, theta_mid, theta_right]
 
-	xs = np.cos(thetas)
+    xs = np.cos(thetas)
 
-	h_top = np.sin(theta_left)
-	dip_coeff = np.cos(theta_gap/2)
-	hs = [h_top, h_top * dip_coeff, h_top]
+    h_top = np.sin(theta_left)
+    dip_coeff = np.cos(theta_gap/2)
+    hs = [h_top, h_top * dip_coeff, h_top]
 
-	h_fn = interpolate.interp1d(xs, hs, kind = 'quadratic')
-	xs = np.linspace(start = xs[0], stop = xs[2], num = 20)
-	hs = h_fn(xs)
-	rs = np.linalg.norm([hs, xs], axis = 0)
-	thetas = np.arctan2(hs, xs)
-	thetas = thetas - np.min(thetas)
+    h_fn = interpolate.interp1d(xs, hs, kind = 'quadratic')
+    xs = np.linspace(start = xs[0], stop = xs[2], num = 20)
+    hs = h_fn(xs)
+    rs = np.linalg.norm([hs, xs], axis = 0)
+    thetas = np.arctan2(hs, xs)
+    thetas = thetas - np.min(thetas)
+    
+    if theta_gap_orig > np.pi:
+        thetas = 2*np.pi - thetas
 
-	return (rs * radius, thetas + start_radian)
+    thetas = thetas + start_radian
+    
+    return (rs * radius, thetas)
 
 def _plot_info(circ):
     num_nodes = len(circ['nodes']) if 'nodes' in circ else len(circ['edges'])
@@ -151,7 +155,6 @@ def plot_circro(my_circ):
                 if (weight > my_circ['edge_threshold']):
                     end_node = nodes[nodes['label'] == end_label]
                     end_theta = np.deg2rad(end_node['label_loc'][0])
-                    (start_theta, end_theta) = np.sort([start_theta, end_theta])
                     (radii, thetas) = _calculate_radial_arc(start_theta, end_theta, inner_r)
                     ax.plot(thetas, radii)
 
