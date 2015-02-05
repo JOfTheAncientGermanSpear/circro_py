@@ -62,23 +62,25 @@ def _calculate_radial_arc(theta_gap, radius):
 	if theta_gap > np.pi:
 		theta_gap = theta_gap - np.pi
 	
-	theta_mid = theta_gap/2
+	theta_mid = np.pi/2
+	theta_left = theta_mid - theta_gap/2
+	theta_right = theta_mid + theta_gap/2
+	thetas = [theta_left, theta_mid, theta_right]
 
-	x_stop = np.cos(theta_gap)
-	y_stop = np.sin(theta_gap)
-	dist = np.linalg.norm([x_stop, y_stop])
-	elevation = radius - dist/2 if dist < 2 * radius else 0
-	x_mid = elevation * x_stop
-	y_mid = elevation * y_stop
-	xs = [1, x_mid, x_stop]
-	ys = [0, y_mid, y_stop]
-	x_fn = interpolate.interp1d([0, theta_mid, theta_gap], xs, kind = 'quadratic')
-	y_fn = interpolate.interp1d([0, theta_mid, theta_gap], ys, kind = 'quadratic')
-	theta_i = np.linspace(0, theta_gap, 20)
+	xs = np.cos(thetas)
 
-	rs = np.linalg.norm([x_fn(theta_i), y_fn(theta_i)], axis = 0)
+	h_top = np.sin(theta_left)
+	dip_coeff = np.cos(theta_gap/2)
+	hs = [h_top, h_top * dip_coeff, h_top]
 
-	return (rs, theta_i)
+	h_fn = interpolate.interp1d(xs, hs, kind = 'quadratic')
+	xs = np.linspace(start = xs[0], stop = xs[2], num = 20)
+	hs = h_fn(xs)
+	rs = np.linalg.norm([hs, xs], axis = 0)
+	thetas = np.arctan2(hs, xs)
+	thetas = thetas - np.min(thetas)
+
+	return (rs * radius, thetas)
 
 def _plot_info(circ):
     num_nodes = len(circ['nodes']) if 'nodes' in circ else len(circ['edges'])
@@ -132,7 +134,7 @@ def plot_circro(my_circ):
 
 
     if 'edges' in my_circ:
-        edges = my_circ['edges']
+        edges = my_circ['edges'].T
 
         connections = edges.copy()
         connections[connections < my_circ['edge_threshold']] = 0
@@ -142,9 +144,7 @@ def plot_circro(my_circ):
             start_node = nodes[nodes['label'] == start_label]
             start_theta = np.deg2rad(start_node['label_loc'][0])
             for (end_label, weight) in end_edges.iteritems():
-                print('start label {s}, end label {e}'.format(s = start_label, e = end_label))
                 if (weight > my_circ['edge_threshold']):
-                    print('bout to add line')
                     end_node = nodes[nodes['label'] == end_label]
                     end_theta = np.deg2rad(end_node['label_loc'][0])
                     (start_theta, end_theta) = np.sort([start_theta, end_theta])
