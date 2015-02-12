@@ -44,7 +44,7 @@ def make_circro(labels = None, sizes = None, colors = None, edge_matrix = None,
     file_keys = ['labels', 'sizes', 'colors', 'edge_matrix']
 
 
-    if not any(f in inputs for f in file_keys):
+    if not any(inputs[f] for f in file_keys):
         raise InputError("at least one of {} inputs must be set".format(file_keys))
 
     res = {}
