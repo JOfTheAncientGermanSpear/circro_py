@@ -208,7 +208,7 @@ def _plot_info(circ):
 
 	return info
 
-def plot_circro(my_circ):
+def plot_circro(my_circ, draw = True):
     info = _plot_info(my_circ)
     nodes = info['nodes']
 
@@ -241,7 +241,13 @@ def plot_circro(my_circ):
                     (radii, thetas) = _calculate_radial_arc(start_theta, end_theta, inner_r)
                     ax.plot(thetas, radii)
 
-    plt.show()
+	if draw:
+	    plt.show()
+
+def plot_circros(my_circs):
+	for c in my_circs:
+		plot_circro(c, draw = False)
+	plt.show()
 
 
 if __name__ == "__main__":
