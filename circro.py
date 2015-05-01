@@ -184,6 +184,19 @@ def make_circro_from_dir(src_dir, inner_r = 1.0, start_radian = 0.0, edge_thresh
 
 
 def _calculate_radial_arc(start_radian, end_radian, radius): 
+    """
+    >>> import numpy as np
+    >>> (rs, ts) = _calculate_radial_arc(0, np.pi, 1)
+    >>> assert rs.max() == 1
+    >>> assert rs.min() >= 0
+    >>> assert np.logical_or(ts == 0, ts == np.pi).all()
+    >>> (rs, ts) = _calculate_radial_arc(0, np.pi, 2)
+    >>> assert rs.max() == 2
+    >>> (rs, ts) = _calculate_radial_arc(np.pi * .5, np.pi * 1.5, 1)
+    >>> assert ts.min() == np.pi * .5
+    >>> assert ts.max() == np.pi * 1.5
+    >>> assert np.logical_or(ts[rs == 2] == np.pi * .5, ts[rs == 2] == np.pi * 1.5).all()
+    """
     [start_radian, end_radian] = np.sort([start_radian, end_radian])
 
     theta_gap_orig = end_radian - start_radian
@@ -214,6 +227,7 @@ def _calculate_radial_arc(start_radian, end_radian, radius):
     thetas = thetas + start_radian
     
     return (rs * radius, thetas)
+
 
 def _plot_info(circ):
     num_nodes = len(circ['nodes']) if 'nodes' in circ else len(circ['edges'])
@@ -282,13 +296,12 @@ def plot_circro(my_circ, draw = True):
             end_edges = edges[start_label][:start_label][:-1] #label slices are inclusive
             start_node = nodes[nodes['label'] == start_label]
             start_theta = np.deg2rad(start_node['label_loc'][0])
-            for (end_label, weight) in end_edges.iteritems():
-                if (weight > my_circ['edge_threshold']):
-                    end_node = nodes[nodes['label'] == end_label]
-                    end_theta = np.deg2rad(end_node['label_loc'][0])
-                    (radii, thetas) = _calculate_radial_arc(start_theta, end_theta, inner_r)
-                    clr = info['edge_colors'][start_label][end_label]()
-                    ax.plot(thetas, radii, color = clr)
+            for end_label in end_edges[end_edges > my_circ['edge_threshold']]:
+                end_node = nodes[nodes['label'] == end_label]
+                end_theta = np.deg2rad(end_node['label_loc'][0])
+                (radii, thetas) = _calculate_radial_arc(start_theta, end_theta, inner_r)
+                clr = info['edge_colors'][start_label][end_label]()
+                ax.plot(thetas, radii, color = clr)
 
     if draw:
         plt.show()
