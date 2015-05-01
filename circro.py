@@ -2,6 +2,7 @@ from __future__ import division
 
 import os
 
+import matplotlib.cm as cm
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -14,6 +15,10 @@ class InputError(Exception):
         return repr(self.msg)
 
 def _inputs_to_dict(**kwords):
+    """
+    >>> _inputs_to_dict(k1="v1", k2="v2")
+    {'k2': 'v2', 'k1': 'v1'}
+    """
     return kwords
 
 def _read_node_file(filename, node_type):
@@ -91,7 +96,7 @@ def _raise_input_error(inputs):
 
 
 def make_circro(labels = None, sizes = None, colors = None, edge_matrix = None,
-        inner_r=1.0, start_radian=0.0, edge_threshold=.5):
+        inner_r=1.0, start_radian=0.0, edge_threshold=.5, node_cm = 'jet'):
     inputs = _inputs_to_dict(labels = labels, sizes = sizes, 
             colors = colors, edge_matrix = edge_matrix)
 
@@ -109,10 +114,11 @@ def make_circro(labels = None, sizes = None, colors = None, edge_matrix = None,
     res['inner_r'] = inner_r
     res['start_radian'] = start_radian
     res['edge_threshold'] = edge_threshold
+    res['node_cm'] = node_cm
 
     return res
 
-def make_circro_from_dir(src_dir, inner_r = 1.0, start_radian = 0.0, edge_threshold = .5):
+def make_circro_from_dir(src_dir, inner_r = 1.0, start_radian = 0.0, edge_threshold = .5, node_cm = 'jet'):
 	"""
 	>>> src_dir = 'data' #data has files for labels, colors, sizes, edge_matrix 
 	>>> my_circ_dir = make_circro_from_dir(src_dir)
@@ -136,7 +142,7 @@ def make_circro_from_dir(src_dir, inner_r = 1.0, start_radian = 0.0, edge_thresh
 		_raise_input_error(file_keys)
 
 	inputs.update(_inputs_to_dict(inner_r = inner_r, start_radian = start_radian,
-		edge_threshold = edge_threshold))
+		edge_threshold = edge_threshold, node_cm = node_cm))
 
 	return make_circro(**inputs)
 
@@ -187,6 +193,10 @@ def _plot_info(circ):
 	nodes['width'] = rad_per_node
 	nodes['width'].right = rad_per_node * -1
 
+	node_cm = getattr(cm, circ['node_cm'])
+
+	info['node_colors'] = node_cm(circ['nodes']['colors'] if 'colors' in circ['nodes'] else 1.0)
+
 	start_radian = circ['start_radian']
 	nodes['theta'] = nodes['width'] * nodes.index.labels[1]
 
@@ -221,7 +231,7 @@ def plot_circro(my_circ, draw = True):
     plt.grid(False, axis='x', which='minor') #turn off radial lines
     ax.set_yticklabels([]) #turn off radial labels
 
-    ax.bar(nodes['theta'], nodes['size'], nodes['width'], bottom = inner_r)
+    ax.bar(nodes['theta'], nodes['size'], nodes['width'], bottom = inner_r, color = info['node_colors'])
 
 
     if 'edges' in my_circ:
