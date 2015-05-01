@@ -21,6 +21,40 @@ def _inputs_to_dict(**kwords):
     """
     return kwords
 
+def _scale_matrix(mat):
+	"""
+	>>> import numpy as np
+	>>> x = np.array([[1, 2], [3, 5]])
+	>>> _scale_matrix(x)
+	array([[ 0.  ,  0.25],
+	       [ 0.5 ,  1.  ]])
+	"""
+	mx = mat.max()
+	mn = mat.min()
+	rg = mx - mn
+	return (mat - mn)/rg
+
+
+def _lazy_df(fn, df):
+	"""
+	>>> import numpy as np
+	>>> import pandas as pd
+	>>> df = pd.DataFrame(np.array([[1, 2], [3, 5]]))
+	>>> fn = lambda i: [i - 1, i, i + 1]
+	>>> lz_df = _lazy_df(fn, df)
+	>>> lz_df.iloc[0][0]()
+	[0, 1, 2]
+	>>> lz_df.iloc[0][1]()
+	[1, 2, 3]
+	>>> lz_df.iloc[1][0]()
+	[2, 3, 4]
+	>>> lz_df.iloc[1][1]()
+	[4, 5, 6]
+	"""
+	lazy_fn = lambda i: lambda: fn(i)
+	return df.applymap(lazy_fn)
+
+
 def _read_node_file(filename, node_type):
 	"""
 	>>> x = 'test_data/labels.csv'
@@ -96,7 +130,7 @@ def _raise_input_error(inputs):
 
 
 def make_circro(labels = None, sizes = None, colors = None, edge_matrix = None,
-        inner_r=1.0, start_radian=0.0, edge_threshold=.5, node_cm = 'jet'):
+        inner_r=1.0, start_radian=0.0, edge_threshold=.5, node_cm = 'jet', edge_cm = 'jet'):
     inputs = _inputs_to_dict(labels = labels, sizes = sizes, 
             colors = colors, edge_matrix = edge_matrix)
 
@@ -114,11 +148,13 @@ def make_circro(labels = None, sizes = None, colors = None, edge_matrix = None,
     res['inner_r'] = inner_r
     res['start_radian'] = start_radian
     res['edge_threshold'] = edge_threshold
+
     res['node_cm'] = node_cm
+    res['edge_cm'] = edge_cm
 
     return res
 
-def make_circro_from_dir(src_dir, inner_r = 1.0, start_radian = 0.0, edge_threshold = .5, node_cm = 'jet'):
+def make_circro_from_dir(src_dir, inner_r = 1.0, start_radian = 0.0, edge_threshold = .5, node_cm = 'jet', edge_cm = 'jet'):
 	"""
 	>>> src_dir = 'data' #data has files for labels, colors, sizes, edge_matrix 
 	>>> my_circ_dir = make_circro_from_dir(src_dir)
@@ -142,7 +178,7 @@ def make_circro_from_dir(src_dir, inner_r = 1.0, start_radian = 0.0, edge_thresh
 		_raise_input_error(file_keys)
 
 	inputs.update(_inputs_to_dict(inner_r = inner_r, start_radian = start_radian,
-		edge_threshold = edge_threshold, node_cm = node_cm))
+		edge_threshold = edge_threshold, node_cm = node_cm, edge_cm = edge_cm))
 
 	return make_circro(**inputs)
 
@@ -216,6 +252,11 @@ def _plot_info(circ):
 
 	info['nodes'] = nodes
 
+	if 'edges' in circ:
+		scaled_edges = _scale_matrix(circ['edges'])
+		edge_cm = getattr(cm, circ['edge_cm'])
+		info['edge_colors'] = _lazy_df(edge_cm, scaled_edges) 
+
 	return info
 
 def plot_circro(my_circ, draw = True):
@@ -237,9 +278,6 @@ def plot_circro(my_circ, draw = True):
     if 'edges' in my_circ:
         edges = my_circ['edges'].T
 
-        connections = edges.copy()
-        connections[connections < my_circ['edge_threshold']] = 0
-
         for start_label in edges:
             end_edges = edges[start_label][:start_label][:-1] #label slices are inclusive
             start_node = nodes[nodes['label'] == start_label]
@@ -249,7 +287,8 @@ def plot_circro(my_circ, draw = True):
                     end_node = nodes[nodes['label'] == end_label]
                     end_theta = np.deg2rad(end_node['label_loc'][0])
                     (radii, thetas) = _calculate_radial_arc(start_theta, end_theta, inner_r)
-                    ax.plot(thetas, radii)
+                    clr = info['edge_colors'][start_label][end_label]()
+                    ax.plot(thetas, radii, color = clr)
 
 	if draw:
 	    plt.show()
