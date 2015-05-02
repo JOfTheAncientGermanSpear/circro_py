@@ -51,8 +51,8 @@ def _lazy_df(fn, df):
     >>> lz_df.iloc[1][1]()
     [4, 5, 6]
     """
-    lazy_fn = lambda i: lambda: fn(i)
-    return df.applymap(lazy_fn)
+    lazy_gen = lambda i: lambda: fn(i)
+    return df.applymap(lazy_gen)
 
 
 def _read_node_file(filename, node_type):
@@ -90,6 +90,18 @@ def _create_nodes_df(filename_dict):
           2    BA6    3.5
     >>> cols
     {'labels': ['Regions L', 'Regions R'], 'sizes': ['Sizes L', 'Sizes R']}
+    >>> del x['labels']
+    >>> (df, cols) = _create_nodes_df(x)
+    >>> df
+             sizes
+    left  0    1.0
+          1    2.0
+          2    3.0
+    right 0    1.5
+          1    2.5
+          2    3.5
+    >>> cols
+    {'sizes': ['Sizes L', 'Sizes R']}
     """
     node_file_keys = ['labels', 'sizes', 'colors']
     dfs_cols = [_read_node_file(f, k) for k,f in filename_dict.items() 
@@ -131,6 +143,21 @@ def _raise_input_error(inputs):
 
 def make_circro(labels = None, sizes = None, colors = None, edge_matrix = None,
         inner_r=1.0, start_radian=0.0, edge_threshold=.5, node_cm = 'jet', edge_cm = 'jet'):
+    """
+    >>> from test_utils import temp_dir
+    >>> with temp_dir('test_data/sizes.csv') as fs:
+    ...    my_circ = make_circro(sizes = fs[0])
+    >>> sorted(my_circ.keys())
+    ['_node_columns', 'edge_cm', 'edge_threshold', 'inner_r', 'node_cm', 'nodes', 'start_radian']
+    >>> my_circ['nodes']
+             sizes
+    left  0    1.0
+          1    2.0
+          2    3.0
+    right 0    1.5
+          1    2.5
+          2    3.5
+    """
     inputs = _inputs_to_dict(labels = labels, sizes = sizes, 
             colors = colors, edge_matrix = edge_matrix)
 
@@ -164,6 +191,11 @@ def make_circro_from_dir(src_dir, inner_r = 1.0, start_radian = 0.0, edge_thresh
     >>> from pandas.util.testing import assert_frame_equal
     >>> assert_frame_equal(my_circ['nodes'], my_circ_dir['nodes'])
     >>> assert_frame_equal(my_circ['edges'], my_circ_dir['edges'])
+    >>> from test_utils import temp_dir
+    >>> my_circ = make_circro(sizes = prep('sizes'))
+    >>> with temp_dir('data/sizes.csv') as fs:
+    ...    my_circ_dir = make_circro_from_dir(os.path.dirname(fs[0]))
+    >>> assert_frame_equal(my_circ['nodes'], my_circ_dir['nodes'])
     """
     file_keys = {'labels', 'colors', 'sizes', 'edge_matrix'}
 
@@ -230,6 +262,12 @@ def _calculate_radial_arc(start_radian, end_radian, radius):
 
 
 def _plot_info(circ):
+    """
+    >>> from test_utils import temp_dir
+    >>> with temp_dir('test_data/sizes.csv') as fs:
+    ...    my_circ = make_circro(sizes = fs[0])
+    >>> info = _plot_info(my_circ)
+    """
     num_nodes = len(circ['nodes']) if 'nodes' in circ else len(circ['edges'])
     rad_per_node = 2 * np.pi/num_nodes
 
@@ -238,6 +276,8 @@ def _plot_info(circ):
 
     #get the index & main data fram circ
     nodes['label'] = circ['nodes']['labels'] if 'labels' in circ['nodes'] else circ['nodes'].index.labels[1]
+    nodes.index = circ['nodes'].index
+
     nodes['size'] = circ['nodes']['sizes'] if 'sizes' in circ['nodes'] else 1
 
     nodes['width'] = rad_per_node
