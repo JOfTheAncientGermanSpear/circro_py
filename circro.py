@@ -8,11 +8,14 @@ import numpy as np
 import pandas as pd
 from scipy import interpolate
 
+
 class InputError(Exception):
     def __init__(self, msg):
         self.msg = msg
+
     def __str__(self):
         return repr(self.msg)
+
 
 def _inputs_to_dict(**kwords):
     """
@@ -21,18 +24,32 @@ def _inputs_to_dict(**kwords):
     """
     return kwords
 
-def _scale_matrix(mat):
+
+def _scale_matrix(mat, new_min=0, new_max=1, selectors=None):
     """
     >>> import numpy as np
     >>> x = np.array([[1, 2], [3, 5]])
     >>> _scale_matrix(x)
     array([[ 0.  ,  0.25],
            [ 0.5 ,  1.  ]])
+    >>> _scale_matrix(x, 2, 4)
+    array([[ 2. ,  2.5],
+           [ 3. ,  4. ]])
+    >>> x = np.array([[0, 1], [3, 5]])
+    >>> _scale_matrix(x, 4, 8, x!=0)
+    array([[ 0.,  4.],
+           [ 6.,  8.]])
     """
-    mx = mat.max()
-    mn = mat.min()
+    if selectors is None:
+        selectors = np.ones(mat.shape) == 1
+    mx = mat[selectors].max()
+    mn = mat[selectors].min()
     rg = mx - mn
-    return (mat - mn)/rg
+    new_rg = new_max - new_min
+    ratio = new_rg/rg
+    new_mat = mat.astype(float)
+    new_mat[selectors] = (mat[selectors] - mn) * ratio + new_min
+    return new_mat
 
 
 def _lazy_df(fn, df):
@@ -74,7 +91,8 @@ def _read_node_file(filename, node_type):
     (left, right) = data.columns
     df = pd.concat([data[left], data[right]], keys=['left', 'right']).to_frame()
     df.columns = [node_type]
-    return (df, [left, right])
+    return df, [left, right]
+
 
 def _create_nodes_df(filename_dict):
     """
@@ -104,51 +122,55 @@ def _create_nodes_df(filename_dict):
     {'sizes': ['Sizes L', 'Sizes R']}
     """
     node_file_keys = ['labels', 'sizes', 'colors']
-    dfs_cols = [_read_node_file(f, k) for k,f in filename_dict.items() 
-            if f and k in node_file_keys]
+    dfs_cols = [_read_node_file(f, k) for k, f in filename_dict.items()
+                if f and k in node_file_keys]
     dfs = [df_col[0] for df_col in dfs_cols]
     cols = {df_col[0].columns[0]: df_col[1] for df_col in dfs_cols}
-    df = pd.concat(dfs, axis = 1)
-    return (df, cols)
+    df = pd.concat(dfs, axis=1)
+    return df, cols
 
 
-def _create_edges_df(edge_file, nodes):
+def _create_edges_df(edge_file, left_len, right_len):
     """
     >>> import pandas as pd
     >>> left = pd.Series(['BA1', 'BA2', 'BA3'])
     >>> right = pd.Series(['BA4', 'BA5', 'BA6'])
     >>> nodes = pd.concat([left, right], keys = ['left', 'right']).to_frame()
-    >>> nodes.columns = ['labels']
     >>> edge_file = 'test_data/edge_matrix.csv'
-    >>> df = _create_edges_df(edge_file, nodes)
+    >>> df = _create_edges_df(edge_file, len(nodes.loc['left']), len(nodes.loc['right']))
     >>> df
-         BA1  BA2  BA3  BA4  BA5  BA6
-    BA1  0.0  1.2  1.3  1.4  1.5  1.6
-    BA2  1.2  0.0  2.3  0.0  0.0  0.0
-    BA3  1.3  2.3  0.0  0.0  0.0  3.6
-    BA4  1.4  0.0  0.0  0.0  4.5  0.0
-    BA5  1.5  0.0  0.0  4.5  0.0  0.0
-    BA6  1.6  0.0  3.6  0.0  0.0  0.0
+             left            right          
+                0    1    2      0    1    2
+    left  0   0.0  1.2  1.3    1.4  1.5  1.6
+          1   1.2  0.0  2.3    0.0  0.0  0.0
+          2   1.3  2.3  0.0    0.0  0.0  3.6
+    right 0   1.4  0.0  0.0    0.0  4.5  0.0
+          1   1.5  0.0  0.0    4.5  0.0  0.0
+          2   1.6  0.0  3.6    0.0  0.0  0.0
     """
+    outer_index = ['left']*left_len + ['right']*right_len
+    inner_index = range(left_len) + range(right_len)
+    index = pd.MultiIndex.from_arrays([outer_index, inner_index])
+
     edges = pd.read_csv(edge_file, header=None)
-    if 'labels' in nodes:
-        labels = nodes['labels']
-        edges.columns = labels.values
-        edges.index = labels.values
+    edges.columns = index
+    edges.index = index
     return edges
+
 
 def _raise_input_error(inputs):
     raise InputError("at least one of {} inputs must be set".format(inputs))
 
 
-def make_circro(labels = None, sizes = None, colors = None, edge_matrix = None,
-        inner_r=1.0, start_radian=0.0, edge_threshold=.5, node_cm = 'jet', edge_cm = 'jet'):
+def make_circro(labels=None, sizes=None, colors=None, edge_matrix=None,
+                inner_r=1.0, start_radian=0.0, edge_threshold=.5, node_cm='jet', edge_cm='jet',
+                draw_labels=True, edge_render_thickness=None):
     """
     >>> from test_utils import temp_dir
     >>> with temp_dir('test_data/sizes.csv') as fs:
     ...    my_circ = make_circro(sizes = fs[0])
     >>> sorted(my_circ.keys())
-    ['_node_columns', 'edge_cm', 'edge_threshold', 'inner_r', 'node_cm', 'nodes', 'start_radian']
+    ['_node_columns', 'draw_labels', 'edge_cm', 'edge_render_thickness', 'edge_threshold', 'inner_r', 'node_cm', 'nodes', 'start_radian']
     >>> my_circ['nodes']
              sizes
     left  0    1.0
@@ -158,19 +180,20 @@ def make_circro(labels = None, sizes = None, colors = None, edge_matrix = None,
           1    2.5
           2    3.5
     """
-    inputs = _inputs_to_dict(labels = labels, sizes = sizes, 
-            colors = colors, edge_matrix = edge_matrix)
+    inputs = _inputs_to_dict(labels=labels, sizes=sizes,
+                             colors=colors, edge_matrix=edge_matrix)
 
     file_keys = ['labels', 'sizes', 'colors', 'edge_matrix']
-
 
     if not any(inputs[f] for f in file_keys):
         _raise_input_error(file_keys)
 
-    res = {}
+    res = dict()
     res['nodes'], res['_node_columns'] = _create_nodes_df(inputs) 
     if edge_matrix:
-        res['edges'] = _create_edges_df(edge_matrix, res['nodes'])
+        res['edges'] = _create_edges_df(edge_matrix,
+                                        len(res['nodes'].loc['left']),
+                                        len(res['nodes'].loc['right']))
 
     res['inner_r'] = inner_r
     res['start_radian'] = start_radian
@@ -179,15 +202,23 @@ def make_circro(labels = None, sizes = None, colors = None, edge_matrix = None,
     res['node_cm'] = node_cm
     res['edge_cm'] = edge_cm
 
+    res['draw_labels'] = draw_labels
+
+    res['edge_render_thickness'] = edge_render_thickness
+
     return res
 
-def make_circro_from_dir(src_dir, inner_r = 1.0, start_radian = 0.0, edge_threshold = .5, node_cm = 'jet', edge_cm = 'jet'):
+
+def make_circro_from_dir(src_dir, inner_r=1.0, start_radian=0.0, edge_threshold=.5,
+                         node_cm='jet', edge_cm='jet', draw_labels=True, edge_render_thickness=None):
     """
     >>> src_dir = 'data' #data has files for labels, colors, sizes, edge_matrix 
     >>> my_circ_dir = make_circro_from_dir(src_dir)
     >>> import os
     >>> prep = lambda(l): os.path.join(src_dir, l + '.csv')
-    >>> my_circ = make_circro(labels = prep('labels'), sizes = prep('sizes'), colors = prep('colors'), edge_matrix = prep('edge_matrix'))
+    >>> my_circ = make_circro(labels = prep('labels'),
+    ...     sizes = prep('sizes'), colors = prep('colors'),
+    ...     edge_matrix = prep('edge_matrix'))
     >>> from pandas.util.testing import assert_frame_equal
     >>> assert_frame_equal(my_circ['nodes'], my_circ_dir['nodes'])
     >>> assert_frame_equal(my_circ['edges'], my_circ_dir['edges'])
@@ -206,11 +237,13 @@ def make_circro_from_dir(src_dir, inner_r = 1.0, start_radian = 0.0, edge_thresh
     
     inputs = reduce(add_file_input, file_keys, dict())
 
-    if all(inputs[i] == None for i in file_keys):
+    if all(inputs[i] is None for i in file_keys):
         _raise_input_error(file_keys)
 
-    inputs.update(_inputs_to_dict(inner_r = inner_r, start_radian = start_radian,
-        edge_threshold = edge_threshold, node_cm = node_cm, edge_cm = edge_cm))
+    inputs.update(_inputs_to_dict(inner_r=inner_r, start_radian=start_radian,
+                                  edge_threshold=edge_threshold, node_cm=node_cm, edge_cm=edge_cm,
+                                  draw_labels=draw_labels,edge_render_thickness=edge_render_thickness
+                                  ))
 
     return make_circro(**inputs)
 
@@ -233,7 +266,7 @@ def _calculate_radial_arc(start_radian, end_radian, radius):
 
     theta_gap_orig = end_radian - start_radian
 
-    theta_gap =  theta_gap_orig if theta_gap_orig < np.pi else 2*np.pi - theta_gap_orig
+    theta_gap = theta_gap_orig if theta_gap_orig < np.pi else 2*np.pi - theta_gap_orig
     
     theta_mid = np.pi/2
     theta_left = theta_mid - theta_gap/2
@@ -246,10 +279,10 @@ def _calculate_radial_arc(start_radian, end_radian, radius):
     dip_coeff = np.cos(theta_gap/2)
     hs = [h_top, h_top * dip_coeff, h_top]
 
-    h_fn = interpolate.interp1d(xs, hs, kind = 'quadratic')
-    xs = np.linspace(start = xs[0], stop = xs[2], num = 20)
+    h_fn = interpolate.interp1d(xs, hs, kind='quadratic')
+    xs = np.linspace(start=xs[0], stop=xs[2], num=20)
     hs = h_fn(xs)
-    rs = np.linalg.norm([hs, xs], axis = 0)
+    rs = np.linalg.norm([hs, xs], axis=0)
     thetas = np.arctan2(hs, xs)
     thetas = thetas - np.min(thetas)
     
@@ -258,7 +291,7 @@ def _calculate_radial_arc(start_radian, end_radian, radius):
 
     thetas = thetas + start_radian
     
-    return (rs * radius, thetas)
+    return rs * radius, thetas
 
 
 def _plot_info(circ):
@@ -274,8 +307,8 @@ def _plot_info(circ):
     info = {}
     nodes = pd.DataFrame()
 
-    #get the index & main data fram circ
-    nodes['label'] = circ['nodes']['labels'] if 'labels' in circ['nodes'] else circ['nodes'].index.labels[1]
+    nodes['label'] = circ['nodes']['labels'] \
+        if 'labels' in circ['nodes'] else circ['nodes'].index.labels[1]
     nodes.index = circ['nodes'].index
 
     nodes['size'] = circ['nodes']['sizes'] if 'sizes' in circ['nodes'] else 1
@@ -291,7 +324,7 @@ def _plot_info(circ):
     nodes['theta'] = nodes['width'] * nodes.index.labels[1]
 
     nodes['label_loc'] = nodes['theta'] * 180/np.pi
-    nodes['label_loc'].right = 360 + nodes['label_loc'].right
+    nodes['label_loc'].right += 360
 
     deg_per_node = np.rad2deg(rad_per_node)
     nodes['label_loc'].left = nodes['label_loc'].left + deg_per_node/2
@@ -309,46 +342,57 @@ def _plot_info(circ):
     if 'edges' in circ:
         scaled_edges = _scale_matrix(circ['edges'])
         edge_cm = getattr(cm, circ['edge_cm'])
-        info['edge_colors'] = _lazy_df(edge_cm, scaled_edges) 
+        info['edge_colors'] = _lazy_df(edge_cm, scaled_edges)
 
     return info
 
-def plot_circro(my_circ, draw = True):
+
+def plot_circro(my_circ, draw=True):
     info = _plot_info(my_circ)
     nodes = info['nodes']
 
     inner_r = my_circ['inner_r']
 
-    ax = plt.subplot(111, polar = True)
-    plt.thetagrids(nodes['label_loc'], nodes['label'])
+    ax = plt.subplot(111, polar=True)
 
-    plt.grid(False, axis='y', which='both') #turn off radial lines
-    plt.grid(False, axis='x', which='minor') #turn off radial lines
-    ax.set_yticklabels([]) #turn off radial labels
+    if my_circ['draw_labels']:
+        plt.thetagrids(nodes['label_loc'], nodes['label'])
 
-    ax.bar(nodes['theta'], nodes['size'], nodes['width'], bottom = inner_r, color = info['node_colors'])
+#   turn off radial lines
+    plt.grid(False, axis='y', which='both')
+    plt.grid(False, axis='x', which='both')
+    ax.set_yticklabels([])
 
+    ax.bar(nodes['theta'], nodes['size'], nodes['width'], bottom=inner_r, color=info['node_colors'])
 
     if 'edges' in my_circ:
         edges = my_circ['edges'].T
 
-        for start_label in edges:
-            end_edges = edges[start_label][:start_label][:-1] #label slices are inclusive
-            start_node = nodes[nodes['label'] == start_label]
-            start_theta = np.deg2rad(start_node['label_loc'][0])
-            for end_label in end_edges[end_edges > my_circ['edge_threshold']]:
-                end_node = nodes[nodes['label'] == end_label]
-                end_theta = np.deg2rad(end_node['label_loc'][0])
+        index_to_theta = lambda i: np.rad2deg(nodes.loc[i]['theta'])
+
+        if my_circ['edge_render_thickness']:
+            new_min, new_max = my_circ['edge_render_thickness']
+            edge_thicknesses = _scale_matrix(edges, new_min, new_max,
+                                             edges > my_circ['edge_threshold'])
+        else:
+            edge_thicknesses = edges
+
+        for start_index in edges:
+            end_edges = edges[start_index][:start_index][:-1]
+            start_theta = index_to_theta(start_index)
+            for end_index in end_edges.index[end_edges > my_circ['edge_threshold']]:
+                end_theta = index_to_theta(end_index)
                 (radii, thetas) = _calculate_radial_arc(start_theta, end_theta, inner_r)
-                clr = info['edge_colors'][start_label][end_label]()
-                ax.plot(thetas, radii, color = clr)
+                clr = info['edge_colors'][start_index][end_index]()
+                ax.plot(thetas, radii, color=clr, ls='-', lw=edge_thicknesses[start_index][end_index])
 
     if draw:
         plt.show()
 
+
 def plot_circros(my_circs):
     for c in my_circs:
-        plot_circro(c, draw = False)
+        plot_circro(c, draw=False)
     plt.show()
 
 
