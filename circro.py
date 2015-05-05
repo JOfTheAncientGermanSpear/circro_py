@@ -2,6 +2,7 @@ from __future__ import division
 
 import os
 
+import matplotlib as mpl
 import matplotlib.cm as cm
 import matplotlib.pyplot as plt
 import numpy as np
@@ -242,7 +243,7 @@ def make_circro_from_dir(src_dir, inner_r=1.0, start_radian=0.0, edge_threshold=
 
     inputs.update(_inputs_to_dict(inner_r=inner_r, start_radian=start_radian,
                                   edge_threshold=edge_threshold, node_cm=node_cm, edge_cm=edge_cm,
-                                  draw_labels=draw_labels,edge_render_thickness=edge_render_thickness
+                                  draw_labels=draw_labels, edge_render_thickness=edge_render_thickness
                                   ))
 
     return make_circro(**inputs)
@@ -319,6 +320,10 @@ def _plot_info(circ):
     node_cm = getattr(cm, circ['node_cm'])
 
     info['node_colors'] = node_cm(circ['nodes']['colors'] if 'colors' in circ['nodes'] else 1.0)
+    if 'colors' in circ['nodes']:
+        info['node_colors_norm'] = \
+            mpl.colors.Normalize(vmin=circ['nodes']['colors'].min().min(),
+                                 vmax=circ['nodes']['colors'].max().max())
 
     start_radian = circ['start_radian']
     nodes['theta'] = nodes['width'] * nodes.index.labels[1]
@@ -340,9 +345,14 @@ def _plot_info(circ):
     info['nodes'] = nodes
 
     if 'edges' in circ:
-        scaled_edges = _scale_matrix(circ['edges'])
+        mask = circ['edges'] > circ['edge_threshold']
+        scaled_edges = _scale_matrix(circ['edges'], selectors=mask)
         edge_cm = getattr(cm, circ['edge_cm'])
         info['edge_colors'] = _lazy_df(edge_cm, scaled_edges)
+        info['edge_colors_norm'] = mpl.colors.Normalize(
+            vmin=circ['edges'][mask].min().min(),
+            vmax=circ['edges'][mask].max().max()
+        )
 
     return info
 
@@ -353,7 +363,7 @@ def plot_circro(my_circ, draw=True):
 
     inner_r = my_circ['inner_r']
 
-    ax = plt.subplot(111, polar=True)
+    ax = plt.subplot(111, projection='polar')
 
     if my_circ['draw_labels']:
         plt.thetagrids(nodes['label_loc'], nodes['label'])
@@ -364,6 +374,11 @@ def plot_circro(my_circ, draw=True):
     ax.set_yticklabels([])
 
     ax.bar(nodes['theta'], nodes['size'], nodes['width'], bottom=inner_r, color=info['node_colors'])
+    if 'node_colors_norm' in info:
+        norm = info['node_colors_norm']
+        ax_color, params = mpl.colorbar.make_axes(ax, location='left')
+        mpl.colorbar.ColorbarBase(ax_color, norm=norm,
+                                  cmap=getattr(cm, my_circ['node_cm']), **params)
 
     if 'edges' in my_circ:
         edges = my_circ['edges'].T
@@ -385,6 +400,11 @@ def plot_circro(my_circ, draw=True):
                 (radii, thetas) = _calculate_radial_arc(start_theta, end_theta, inner_r)
                 clr = info['edge_colors'][start_index][end_index]()
                 ax.plot(thetas, radii, color=clr, ls='-', lw=edge_thicknesses[start_index][end_index])
+
+        norm = info['edge_colors_norm']
+        ax_color, params = mpl.colorbar.make_axes(ax, location='right')
+        mpl.colorbar.ColorbarBase(ax_color, norm=norm,
+                                  cmap=getattr(cm, my_circ['edge_cm']), **params)
 
     if draw:
         plt.show()
