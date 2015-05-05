@@ -20,6 +20,10 @@ class InputError(Exception):
 
 def _inputs_to_dict(**kwords):
     """
+    Return a dictionary from named arguments
+
+    Examples
+    --------
     >>> _inputs_to_dict(k1="v1", k2="v2")
     {'k2': 'v2', 'k1': 'v1'}
     """
@@ -28,6 +32,10 @@ def _inputs_to_dict(**kwords):
 
 def _scale_matrix(mat, new_min=0, new_max=1, selectors=None):
     """
+    Return a scaled version of a matrix
+
+    Examples
+    --------
     >>> import numpy as np
     >>> x = np.array([[1, 2], [3, 5]])
     >>> _scale_matrix(x)
@@ -55,6 +63,12 @@ def _scale_matrix(mat, new_min=0, new_max=1, selectors=None):
 
 def _lazy_df(fn, df):
     """
+    maps each element of a Pandas dataframe into a function
+    this allows for executing code in a lazy manner - only when necessary
+    it also facilitates changing the dimension of each element in the dataframe
+    
+    Examples
+    --------
     >>> import numpy as np
     >>> import pandas as pd
     >>> df = pd.DataFrame(np.array([[1, 2], [3, 5]]))
@@ -75,6 +89,13 @@ def _lazy_df(fn, df):
 
 def _read_node_file(filename, node_type):
     """
+    Reads a CSV File into a Pandas Dataframe
+    The CSV file is expected to have 2 columns and a header row
+    Left column for left nodes
+    Right column for right nodes
+
+    Examples
+    --------
     >>> x = 'test_data/labels.csv'
     >>> (df, cols) = _read_node_file(x, 'labels')
     >>> df
@@ -97,6 +118,12 @@ def _read_node_file(filename, node_type):
 
 def _create_nodes_df(filename_dict):
     """
+    Converts a dictionary of node_type, node_csv_file to a dataframe
+    Each column of the resultant dataframe corresponds to a different
+    node type
+
+    Examples
+    --------
     >>> x = {'labels': 'test_data/labels.csv', 'sizes': 'test_data/sizes.csv'}
     >>> (df, cols) = _create_nodes_df(x)
     >>> df
@@ -133,6 +160,14 @@ def _create_nodes_df(filename_dict):
 
 def _create_edges_df(edge_file, left_len, right_len):
     """
+    Reads a CSV file with a header row & data with dimensions
+    number of nodes by number of nodes
+
+    Which rows/cols are specified as right or left set by inputs
+    left_len and right_len
+
+    Examples
+    --------
     >>> import pandas as pd
     >>> left = pd.Series(['BA1', 'BA2', 'BA3'])
     >>> right = pd.Series(['BA4', 'BA5', 'BA6'])
@@ -167,6 +202,11 @@ def make_circro(labels=None, sizes=None, colors=None, edge_matrix=None,
                 inner_r=1.0, start_radian=0.0, edge_threshold=.5, node_cm='jet', edge_cm='jet',
                 draw_labels=True, draw_nodes_colorbar=None, edge_render_thickness=None):
     """
+    Generates a circular diagram data structure that contains data to be rendered with
+    plot_circro. See plot_circro
+
+    Examples
+    --------
     >>> from test_utils import temp_dir
     >>> with temp_dir('test_data/sizes.csv') as fs:
     ...    my_circ = make_circro(sizes = fs[0])
@@ -216,6 +256,12 @@ def make_circro_from_dir(src_dir, inner_r=1.0, start_radian=0.0, edge_threshold=
                          node_cm='jet', edge_cm='jet', draw_labels=True,
                          draw_nodes_colorbar=True, edge_render_thickness=None):
     """
+    Wrapper for make_circro
+    src_dir must contain at least one of the following files:
+        labels.csv, colors.csv, sizes.csv, edge_matrix.csv
+
+    Examples
+    --------
     >>> src_dir = 'data' #data has files for labels, colors, sizes, edge_matrix 
     >>> my_circ_dir = make_circro_from_dir(src_dir)
     >>> import os
@@ -241,7 +287,7 @@ def make_circro_from_dir(src_dir, inner_r=1.0, start_radian=0.0, edge_threshold=
     
     inputs = reduce(add_file_input, file_keys, dict())
 
-    if all(inputs[i] is None for i in file_keys):
+    if all([inputs[i] is None for i in file_keys]):
         _raise_input_error(file_keys)
 
     inputs.update(_inputs_to_dict(inner_r=inner_r, start_radian=start_radian,
@@ -255,6 +301,10 @@ def make_circro_from_dir(src_dir, inner_r=1.0, start_radian=0.0, edge_threshold=
 
 def _calculate_radial_arc(start_radian, end_radian, radius): 
     """
+    Calculates the radii and thetas corresponding to an arc between start_radian and end_radian
+
+    Examples
+    --------
     >>> import numpy as np
     >>> (rs, ts) = _calculate_radial_arc(0, np.pi, 1)
     >>> assert rs.max() == 1
@@ -301,6 +351,11 @@ def _calculate_radial_arc(start_radian, end_radian, radius):
 
 def _plot_info(circ):
     """
+    Calculates render inputs from a circro structure
+    see plot_circro, make_circro
+
+    Examples
+    --------
     >>> from test_utils import temp_dir
     >>> with temp_dir('test_data/sizes.csv') as fs:
     ...    my_circ = make_circro(sizes = fs[0])
@@ -362,6 +417,14 @@ def _plot_info(circ):
 
 
 def plot_circro(my_circ, draw=True):
+    """
+    Renders diagram associated with a circro structure
+
+    Examples
+    --------
+    my_circ = circro.make_circro_from_dir('test_data')
+    plot_circro(my_circ)
+    """
     info = _plot_info(my_circ)
     nodes = info['nodes']
 
@@ -417,6 +480,15 @@ def plot_circro(my_circ, draw=True):
 
 
 def plot_circros(my_circs):
+    """
+    Renders diagram for a list of circros
+
+    Examples
+    --------
+    my_circ = make_circro_from_dir('test_dir', draw_labels=False)
+    my_circ2 = make_circro(labels='test_dir/labels.csv', inner_r = 2)
+    plot_circros([my_circ, my_circ2])
+    """
     for c in my_circs:
         plot_circro(c, draw=False)
     plt.show()
