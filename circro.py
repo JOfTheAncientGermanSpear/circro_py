@@ -165,13 +165,13 @@ def _raise_input_error(inputs):
 
 def make_circro(labels=None, sizes=None, colors=None, edge_matrix=None,
                 inner_r=1.0, start_radian=0.0, edge_threshold=.5, node_cm='jet', edge_cm='jet',
-                draw_labels=True, edge_render_thickness=None):
+                draw_labels=True, draw_nodes_colorbar=None, edge_render_thickness=None):
     """
     >>> from test_utils import temp_dir
     >>> with temp_dir('test_data/sizes.csv') as fs:
     ...    my_circ = make_circro(sizes = fs[0])
     >>> sorted(my_circ.keys())
-    ['_node_columns', 'draw_labels', 'edge_cm', 'edge_render_thickness', 'edge_threshold', 'inner_r', 'node_cm', 'nodes', 'start_radian']
+    ['_node_columns', 'draw_labels', 'draw_nodes_colorbar', 'edge_cm', 'edge_render_thickness', 'edge_threshold', 'inner_r', 'node_cm', 'nodes', 'start_radian']
     >>> my_circ['nodes']
              sizes
     left  0    1.0
@@ -204,6 +204,8 @@ def make_circro(labels=None, sizes=None, colors=None, edge_matrix=None,
     res['edge_cm'] = edge_cm
 
     res['draw_labels'] = draw_labels
+    res['draw_nodes_colorbar'] = draw_nodes_colorbar \
+        if draw_nodes_colorbar is not None else 'colors' in res['nodes']
 
     res['edge_render_thickness'] = edge_render_thickness
 
@@ -211,7 +213,8 @@ def make_circro(labels=None, sizes=None, colors=None, edge_matrix=None,
 
 
 def make_circro_from_dir(src_dir, inner_r=1.0, start_radian=0.0, edge_threshold=.5,
-                         node_cm='jet', edge_cm='jet', draw_labels=True, edge_render_thickness=None):
+                         node_cm='jet', edge_cm='jet', draw_labels=True,
+                         draw_nodes_colorbar=True, edge_render_thickness=None):
     """
     >>> src_dir = 'data' #data has files for labels, colors, sizes, edge_matrix 
     >>> my_circ_dir = make_circro_from_dir(src_dir)
@@ -243,7 +246,8 @@ def make_circro_from_dir(src_dir, inner_r=1.0, start_radian=0.0, edge_threshold=
 
     inputs.update(_inputs_to_dict(inner_r=inner_r, start_radian=start_radian,
                                   edge_threshold=edge_threshold, node_cm=node_cm, edge_cm=edge_cm,
-                                  draw_labels=draw_labels, edge_render_thickness=edge_render_thickness
+                                  draw_labels=draw_labels, draw_nodes_colorbar=draw_nodes_colorbar,
+                                  edge_render_thickness=edge_render_thickness
                                   ))
 
     return make_circro(**inputs)
@@ -279,8 +283,8 @@ def _calculate_radial_arc(start_radian, end_radian, radius):
     h_top = np.sin(theta_left)
     dip_coeff = np.cos(theta_gap/2)
     hs = [h_top, h_top * dip_coeff, h_top]
-
     h_fn = interpolate.interp1d(xs, hs, kind='quadratic')
+
     xs = np.linspace(start=xs[0], stop=xs[2], num=20)
     hs = h_fn(xs)
     rs = np.linalg.norm([hs, xs], axis=0)
@@ -320,7 +324,7 @@ def _plot_info(circ):
     node_cm = getattr(cm, circ['node_cm'])
 
     info['node_colors'] = node_cm(circ['nodes']['colors'] if 'colors' in circ['nodes'] else 1.0)
-    if 'colors' in circ['nodes']:
+    if circ['draw_nodes_colorbar']:
         info['node_colors_norm'] = \
             mpl.colors.Normalize(vmin=circ['nodes']['colors'].min().min(),
                                  vmax=circ['nodes']['colors'].max().max())
@@ -397,6 +401,8 @@ def plot_circro(my_circ, draw=True):
             start_theta = index_to_theta(start_index)
             for end_index in end_edges.index[end_edges > my_circ['edge_threshold']]:
                 end_theta = index_to_theta(end_index)
+                if start_theta == end_theta:
+                    continue
                 (radii, thetas) = _calculate_radial_arc(start_theta, end_theta, inner_r)
                 clr = info['edge_colors'][start_index][end_index]()
                 ax.plot(thetas, radii, color=clr, ls='-', lw=edge_thicknesses[start_index][end_index])
