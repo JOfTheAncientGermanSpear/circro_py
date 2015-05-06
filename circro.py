@@ -450,7 +450,7 @@ def plot_circro(my_circ, draw=True):
     if 'edges' in my_circ:
         edges = my_circ['edges'].T
 
-        index_to_theta = lambda i: np.rad2deg(nodes.loc[i]['theta'])
+        index_to_theta = lambda i: np.deg2rad(nodes.loc[i]['label_loc'])
 
         if my_circ['edge_render_thickness']:
             new_min, new_max = my_circ['edge_render_thickness']
