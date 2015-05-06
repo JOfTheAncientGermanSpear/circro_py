@@ -24,7 +24,7 @@ def _inputs_to_dict(**kwords):
 
     Examples
     --------
-    >>> _inputs_to_dict(k1="v1", k2="v2")
+    >>> _inputs_to_dict(k1=str("v1"), k2=str("v2"))
     {'k2': 'v2', 'k1': 'v1'}
     """
     return kwords
@@ -124,7 +124,7 @@ def _create_nodes_df(filename_dict):
 
     Examples
     --------
-    >>> x = {'labels': 'test_data/labels.csv', 'sizes': 'test_data/sizes.csv'}
+    >>> x = {str('labels'): 'test_data/labels.csv', str('sizes'): 'test_data/sizes.csv'}
     >>> (df, cols) = _create_nodes_df(x)
     >>> df
             labels  sizes
