@@ -87,7 +87,7 @@ def _lazy_df(fn, df):
     return df.applymap(lazy_gen)
 
 
-def _read_node_file(filename, node_type):
+def _read_node_file(filename):
     """
     Reads a CSV File into a Pandas Dataframe
     The CSV file is expected to have 2 columns and a header row
@@ -97,23 +97,19 @@ def _read_node_file(filename, node_type):
     Examples
     --------
     >>> x = 'test_data/labels.csv'
-    >>> (df, cols) = _read_node_file(x, 'labels')
-    >>> df
-            labels
-    left  0    BA1
-          1    BA2
-          2    BA3
-    right 0    BA4
-          1    BA5
-          2    BA6
-    >>> cols
-    ['Regions L', 'Regions R']
+    >>> _read_node_file(x)
+    left   0    BA1
+           1    BA2
+           2    BA3
+    right  0    BA4
+           1    BA5
+           2    BA6
+    dtype: object
     """
     data = pd.read_csv(filename)
     (left, right) = data.columns
-    df = pd.concat([data[left], data[right]], keys=['left', 'right']).to_frame()
-    df.columns = [node_type]
-    return df, [left, right]
+    df = pd.concat([data[left], data[right]], keys=['left', 'right'])
+    return df
 
 
 def _create_nodes_df(filename_dict):
@@ -125,8 +121,7 @@ def _create_nodes_df(filename_dict):
     Examples
     --------
     >>> x = {str('labels'): 'test_data/labels.csv', str('sizes'): 'test_data/sizes.csv'}
-    >>> (df, cols) = _create_nodes_df(x)
-    >>> df
+    >>> _create_nodes_df(x)
             labels  sizes
     left  0    BA1    1.0
           1    BA2    2.0
@@ -134,11 +129,8 @@ def _create_nodes_df(filename_dict):
     right 0    BA4    1.5
           1    BA5    2.5
           2    BA6    3.5
-    >>> cols
-    {'labels': ['Regions L', 'Regions R'], 'sizes': ['Sizes L', 'Sizes R']}
     >>> del x['labels']
-    >>> (df, cols) = _create_nodes_df(x)
-    >>> df
+    >>> _create_nodes_df(x)
              sizes
     left  0    1.0
           1    2.0
@@ -146,16 +138,23 @@ def _create_nodes_df(filename_dict):
     right 0    1.5
           1    2.5
           2    3.5
-    >>> cols
-    {'sizes': ['Sizes L', 'Sizes R']}
+    >>> left = pd.Series(['BA1', 'BA2', 'BA3'])
+    >>> right = pd.Series(['BA4', 'BA5', 'BA6'])
+    >>> labels = pd.concat([left, right], keys=['left', 'right'])
+    >>> _create_nodes_df({str('labels'): labels, str('sizes'): 'test_data/sizes.csv'})
+            labels  sizes
+    left  0    BA1    1.0
+          1    BA2    2.0
+          2    BA3    3.0
+    right 0    BA4    1.5
+          1    BA5    2.5
+          2    BA6    3.5
     """
     node_file_keys = ['labels', 'sizes', 'colors']
-    dfs_cols = [_read_node_file(f, k) for k, f in filename_dict.items()
-                if f and k in node_file_keys]
-    dfs = [df_col[0] for df_col in dfs_cols]
-    cols = {df_col[0].columns[0]: df_col[1] for df_col in dfs_cols}
-    df = pd.concat(dfs, axis=1)
-    return df, cols
+    series_dict = {k: f if isinstance(f, pd.core.series.Series) else _read_node_file(f)
+            for k, f in filename_dict.items()
+                if f is not None and k in node_file_keys}
+    return pd.concat(series_dict.values(), axis=1, keys=series_dict.keys())
 
 
 def _create_edges_df(edge_file, left_len, right_len):
@@ -169,12 +168,8 @@ def _create_edges_df(edge_file, left_len, right_len):
     Examples
     --------
     >>> import pandas as pd
-    >>> left = pd.Series(['BA1', 'BA2', 'BA3'])
-    >>> right = pd.Series(['BA4', 'BA5', 'BA6'])
-    >>> nodes = pd.concat([left, right], keys = ['left', 'right']).to_frame()
     >>> edge_file = 'test_data/edge_matrix.csv'
-    >>> df = _create_edges_df(edge_file, len(nodes.loc['left']), len(nodes.loc['right']))
-    >>> df
+    >>> _create_edges_df(edge_file, 3, 3)
              left            right          
                 0    1    2      0    1    2
     left  0   0.0  1.2  1.3    1.4  1.5  1.6
@@ -211,7 +206,7 @@ def make_circro(labels=None, sizes=None, colors=None, edge_matrix=None,
     >>> with temp_dir('test_data/sizes.csv') as fs:
     ...    my_circ = make_circro(sizes = fs[0])
     >>> sorted(my_circ.keys())
-    ['_node_columns', 'draw_labels', 'draw_nodes_colorbar', 'edge_cm', 'edge_render_thickness', 'edge_threshold', 'inner_r', 'node_cm', 'nodes', 'start_radian']
+    ['draw_labels', 'draw_nodes_colorbar', 'edge_cm', 'edge_render_thickness', 'edge_threshold', 'inner_r', 'node_cm', 'nodes', 'start_radian']
     >>> my_circ['nodes']
              sizes
     left  0    1.0
@@ -230,7 +225,7 @@ def make_circro(labels=None, sizes=None, colors=None, edge_matrix=None,
         _raise_input_error(file_keys)
 
     res = dict()
-    res['nodes'], res['_node_columns'] = _create_nodes_df(inputs) 
+    res['nodes'] = _create_nodes_df(inputs) 
     if edge_matrix:
         res['edges'] = _create_edges_df(edge_matrix,
                                         len(res['nodes'].loc['left']),
