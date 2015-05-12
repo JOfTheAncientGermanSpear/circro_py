@@ -87,17 +87,18 @@ def _lazy_df(fn, df):
     return df.applymap(lazy_gen)
 
 
-def _read_node_file(filename):
+def _prep_node_data(node_data):
     """
-    Reads a CSV File into a Pandas Dataframe
-    The CSV file is expected to have 2 columns and a header row
+    Reads a 2-Column CSV File with Headers into circro format
+    Or
+    Preps a 2-Column Data-frame into circro format
     Left column for left nodes
     Right column for right nodes
 
     Examples
     --------
     >>> x = 'test_data/labels.csv'
-    >>> _read_node_file(x)
+    >>> _prep_node_data(x)
     left   0    BA1
            1    BA2
            2    BA3
@@ -105,11 +106,23 @@ def _read_node_file(filename):
            1    BA5
            2    BA6
     dtype: object
+    >>> import pandas as pd
+    >>> left = pd.Series(['l1', 'l2'])
+    >>> right = pd.Series(['r1', 'r2'])
+    >>> df = pd.concat([left, right], axis = 1)
+    >>> _prep_node_data(df)
+    left   0    l1
+           1    l2
+    right  0    r1
+           1    r2
+    dtype: object
     """
-    data = pd.read_csv(filename)
+    data = node_data \
+            if isinstance(node_data, pd.core.frame.DataFrame) \
+            else pd.read_csv(node_data)
+
     (left, right) = data.columns
-    df = pd.concat([data[left], data[right]], keys=['left', 'right'])
-    return df
+    return pd.concat([data[left], data[right]], keys=['left', 'right'])
 
 
 def _create_nodes_df(filename_dict):
@@ -151,7 +164,7 @@ def _create_nodes_df(filename_dict):
           2    BA6    3.5
     """
     node_file_keys = ['labels', 'sizes', 'colors']
-    series_dict = {k: f if isinstance(f, pd.core.series.Series) else _read_node_file(f)
+    series_dict = {k: f if isinstance(f, pd.core.series.Series) else _prep_node_data(f)
             for k, f in filename_dict.items()
                 if f is not None and k in node_file_keys}
     return pd.concat(series_dict.values(), axis=1, keys=series_dict.keys())
