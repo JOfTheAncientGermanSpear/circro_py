@@ -97,20 +97,19 @@ def _prep_node_data(node_data):
 
     Examples
     --------
-    >>> x = 'test_data/labels.csv'
-    >>> _prep_node_data(x)
-    left   0    BA1
-           1    BA2
-           2    BA3
-    right  0    BA4
-           1    BA5
-           2    BA6
-    dtype: object
     >>> import pandas as pd
     >>> left = pd.Series(['l1', 'l2'])
     >>> right = pd.Series(['r1', 'r2'])
     >>> df = pd.concat([left, right], axis = 1)
     >>> _prep_node_data(df)
+    left   0    l1
+           1    l2
+    right  0    r1
+           1    r2
+    dtype: object
+    >>> import test_utils
+    >>> with test_utils.temp_dir(df) as fs:
+    ...    _prep_node_data(fs[0])
     left   0    l1
            1    l2
     right  0    r1
@@ -133,8 +132,19 @@ def _create_nodes_df(filename_dict):
 
     Examples
     --------
-    >>> x = {str('labels'): 'test_data/labels.csv', str('sizes'): 'test_data/sizes.csv'}
-    >>> _create_nodes_df(x)
+    >>> left = pd.Series(['BA1', 'BA2', 'BA3'])
+    >>> right = pd.Series(['BA4', 'BA5', 'BA6'])
+    >>> labels = pd.concat([left, right], keys=['left', 'right'], axis = 1)
+    >>> sizes_left = pd.Series([1., 2., 3.])
+    >>> sizes_right = pd.Series([1.5, 2.5, 3.5])
+    >>> sizes = pd.concat([sizes_left, sizes_right], axis = 1)
+    >>> import test_utils
+    >>> with test_utils.temp_dir(labels, sizes) as fs:
+    ...    x = {str('labels'): fs[0], str('sizes'): fs[1]}
+    ...    full_df = _create_nodes_df(x)
+    ...    del x['labels']
+    ...    part_df = _create_nodes_df(x)
+    >>> full_df
             labels  sizes
     left  0    BA1    1.0
           1    BA2    2.0
@@ -142,8 +152,7 @@ def _create_nodes_df(filename_dict):
     right 0    BA4    1.5
           1    BA5    2.5
           2    BA6    3.5
-    >>> del x['labels']
-    >>> _create_nodes_df(x)
+    >>> part_df
              sizes
     left  0    1.0
           1    2.0
@@ -151,20 +160,9 @@ def _create_nodes_df(filename_dict):
     right 0    1.5
           1    2.5
           2    3.5
-    >>> left = pd.Series(['BA1', 'BA2', 'BA3'])
-    >>> right = pd.Series(['BA4', 'BA5', 'BA6'])
-    >>> labels = pd.concat([left, right], keys=['left', 'right'])
-    >>> _create_nodes_df({str('labels'): labels, str('sizes'): 'test_data/sizes.csv'})
-            labels  sizes
-    left  0    BA1    1.0
-          1    BA2    2.0
-          2    BA3    3.0
-    right 0    BA4    1.5
-          1    BA5    2.5
-          2    BA6    3.5
     """
     node_file_keys = ['labels', 'sizes', 'colors']
-    series_dict = {k: f if isinstance(f, pd.core.series.Series) else _prep_node_data(f)
+    series_dict = {k: f if isinstance(f, pd.core.frame.DataFrame) else _prep_node_data(f)
             for k, f in filename_dict.items()
                 if f is not None and k in node_file_keys}
     return pd.concat(series_dict.values(), axis=1, keys=series_dict.keys())
@@ -181,8 +179,20 @@ def _create_edges_df(edge_file, left_len, right_len):
     Examples
     --------
     >>> import pandas as pd
-    >>> edge_file = 'test_data/edge_matrix.csv'
-    >>> _create_edges_df(edge_file, 3, 3)
+    >>> edges = pd.DataFrame([
+    ...     [0.0, 1.2, 1.3, 1.4, 1.5, 1.6],
+    ...     [1.2, 0.0, 2.3, 0.0, 0.0, 0.0],
+    ...     [1.3, 2.3, 0.0, 0.0, 0.0, 3.6],
+    ...     [1.4, 0.0, 0.0, 0.0, 4.5, 0.0],
+    ...     [1.5, 0.0, 0.0, 4.5, 0.0, 0.0],
+    ...     [1.6, 0.0, 3.6, 0.0, 0.0, 0.0]])
+    >>> from test_utils import temp_dir
+    >>> import os
+    >>> with temp_dir(edges) as fs:
+    ...     d = os.path.dirname(fs[0])
+    ...     correct_f = os.path.join(d, 'edge_matrix.csv')
+    ...     edges.to_csv(correct_f, index = False, header=False)
+    ...     _create_edges_df(correct_f, 3, 3)
              left            right          
                 0    1    2      0    1    2
     left  0   0.0  1.2  1.3    1.4  1.5  1.6
@@ -216,7 +226,11 @@ def make_circro(labels=None, sizes=None, colors=None, edge_matrix=None,
     Examples
     --------
     >>> from test_utils import temp_dir
-    >>> with temp_dir('test_data/sizes.csv') as fs:
+    >>> import pandas as pd
+    >>> left = pd.Series([1, 2, 3])
+    >>> right = pd.Series([1.5, 2.5, 3.5])
+    >>> sizes = pd.concat([left, right], axis=1)
+    >>> with temp_dir(sizes) as fs:
     ...    my_circ = make_circro(sizes = fs[0])
     >>> sorted(my_circ.keys())
     ['draw_labels', 'draw_nodes_colorbar', 'edge_cm', 'edge_render_thickness', 'edge_threshold', 'inner_r', 'node_cm', 'nodes', 'start_radian']
@@ -234,7 +248,7 @@ def make_circro(labels=None, sizes=None, colors=None, edge_matrix=None,
 
     file_keys = ['labels', 'sizes', 'colors', 'edge_matrix']
 
-    if not any(inputs[f] for f in file_keys):
+    if all([inputs[f] is None for f in file_keys]):
         _raise_input_error(file_keys)
 
     res = dict()
@@ -270,21 +284,46 @@ def make_circro_from_dir(src_dir, inner_r=1.0, start_radian=0.0, edge_threshold=
 
     Examples
     --------
-    >>> src_dir = 'data' #data has files for labels, colors, sizes, edge_matrix 
-    >>> my_circ_dir = make_circro_from_dir(src_dir)
-    >>> import os
-    >>> prep = lambda(l): os.path.join(src_dir, l + '.csv')
-    >>> my_circ = make_circro(labels = prep('labels'),
-    ...     sizes = prep('sizes'), colors = prep('colors'),
-    ...     edge_matrix = prep('edge_matrix'))
-    >>> from pandas.util.testing import assert_frame_equal
-    >>> assert_frame_equal(my_circ['nodes'], my_circ_dir['nodes'])
-    >>> assert_frame_equal(my_circ['edges'], my_circ_dir['edges'])
+    >>> import pandas as pd
+    >>> edges_df = pd.DataFrame([
+    ...     [0.0, 1.2, 1.3, 1.4, 1.5, 1.6],
+    ...     [1.2, 0.0, 2.3, 0.0, 0.0, 0.0],
+    ...     [1.3, 2.3, 0.0, 0.0, 0.0, 3.6],
+    ...     [1.4, 0.0, 0.0, 0.0, 4.5, 0.0],
+    ...     [1.5, 0.0, 0.0, 4.5, 0.0, 0.0],
+    ...     [1.6, 0.0, 3.6, 0.0, 0.0, 0.0]])
+    >>> sizes_left = pd.Series([i for i in range(3)])
+    >>> sizes_right = pd.Series([i + .5 for i in range(3)])
+    >>> sizes_df = pd.concat([sizes_left, sizes_right], axis = 1)
+    >>> labels_left = pd.Series(['L' + l for l in 'ABC'])
+    >>> labels_right = pd.Series(['R' + l for l in 'ABC'])
+    >>> labels_df = pd.concat([labels_left, labels_right], axis = 1)
+    >>> colors_df = sizes_df
+    >>> import shutil
     >>> from test_utils import temp_dir
-    >>> my_circ = make_circro(sizes = prep('sizes'))
-    >>> with temp_dir('data/sizes.csv') as fs:
-    ...    my_circ_dir = make_circro_from_dir(os.path.dirname(fs[0]))
-    >>> assert_frame_equal(my_circ['nodes'], my_circ_dir['nodes'])
+    >>> with temp_dir(sizes_df, labels_df, colors_df) as fs:
+    ...     d = os.path.dirname(fs[0])
+    ...     def cp(indx, new_name):
+    ...         dest = os.path.join(d, new_name)
+    ...         shutil.copyfile(fs[indx], dest)
+    ...         return dest
+    ...     sizes = cp(0, 'sizes.csv')
+    ...     labels = cp(1, 'labels.csv')
+    ...     colors = cp(2, 'colors.csv')
+    ...     edges = os.path.join(d, 'edge_matrix.csv')
+    ...     edges_df.to_csv(edges, index = False, header = False)
+    ...     my_circ_dir = make_circro_from_dir(d)
+    ...     my_circ = make_circro(labels = labels,
+    ...         sizes = sizes, colors = colors,
+    ...         edge_matrix = edges)
+    >>> from pandas.util.testing import assert_frame_equal
+    >>> from pandas.util.testing import assert_series_equal
+    >>> assert_col = lambda col: assert_frame_equal(my_circ[col], my_circ_dir[col])
+    >>> assert_nodes_col = lambda col: assert_series_equal(my_circ['nodes'][col], my_circ_dir['nodes'][col])
+    >>> assert_col('nodes')
+    >>> assert_nodes_col('sizes')
+    >>> assert_nodes_col('colors')
+    >>> assert_col('edges')
     """
     file_keys = {'labels', 'colors', 'sizes', 'edge_matrix'}
 
@@ -364,8 +403,11 @@ def _plot_info(circ):
 
     Examples
     --------
+    >>> sizes_left = pd.Series([i for i in range(3)])
+    >>> sizes_right = pd.Series([i for i in range(3)])
+    >>> sizes = pd.concat([sizes_left, sizes_right], axis = 1)
     >>> from test_utils import temp_dir
-    >>> with temp_dir('test_data/sizes.csv') as fs:
+    >>> with temp_dir(sizes) as fs:
     ...    my_circ = make_circro(sizes = fs[0])
     >>> info = _plot_info(my_circ)
     """
