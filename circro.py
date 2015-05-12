@@ -108,8 +108,9 @@ def _prep_node_data(node_data):
            1    r2
     dtype: object
     >>> import test_utils
-    >>> with test_utils.temp_dir(df) as fs:
-    ...    _prep_node_data(fs[0])
+    >>> import os
+    >>> with test_utils.temp_dir(labels = df) as d:
+    ...    _prep_node_data(os.path.join(d, 'labels.csv'))
     left   0    l1
            1    l2
     right  0    r1
@@ -139,8 +140,10 @@ def _create_nodes_df(filename_dict):
     >>> sizes_right = pd.Series([1.5, 2.5, 3.5])
     >>> sizes = pd.concat([sizes_left, sizes_right], axis = 1)
     >>> import test_utils
-    >>> with test_utils.temp_dir(labels, sizes) as fs:
-    ...    x = {str('labels'): fs[0], str('sizes'): fs[1]}
+    >>> with test_utils.temp_dir(labels = labels, sizes = sizes) as d:
+    ...    labels_f = os.path.join(d, 'labels.csv')
+    ...    sizes_f = os.path.join(d, 'sizes.csv')
+    ...    x = {str('labels'): labels_f, str('sizes'): sizes_f}
     ...    full_df = _create_nodes_df(x)
     ...    del x['labels']
     ...    part_df = _create_nodes_df(x)
@@ -188,11 +191,9 @@ def _create_edges_df(edge_file, left_len, right_len):
     ...     [1.6, 0.0, 3.6, 0.0, 0.0, 0.0]])
     >>> from test_utils import temp_dir
     >>> import os
-    >>> with temp_dir(edges) as fs:
-    ...     d = os.path.dirname(fs[0])
-    ...     correct_f = os.path.join(d, 'edge_matrix.csv')
-    ...     edges.to_csv(correct_f, index = False, header=False)
-    ...     _create_edges_df(correct_f, 3, 3)
+    >>> with temp_dir(edge_matrix = edges) as d:
+    ...     f = os.path.join(d, 'edge_matrix.csv')
+    ...     _create_edges_df(f, 3, 3)
              left            right          
                 0    1    2      0    1    2
     left  0   0.0  1.2  1.3    1.4  1.5  1.6
@@ -230,8 +231,9 @@ def make_circro(labels=None, sizes=None, colors=None, edge_matrix=None,
     >>> left = pd.Series([1, 2, 3])
     >>> right = pd.Series([1.5, 2.5, 3.5])
     >>> sizes = pd.concat([left, right], axis=1)
-    >>> with temp_dir(sizes) as fs:
-    ...    my_circ = make_circro(sizes = fs[0])
+    >>> import os
+    >>> with temp_dir(sizes = sizes) as d:
+    ...    my_circ = make_circro(sizes = os.path.join(d, 'sizes.csv'))
     >>> sorted(my_circ.keys())
     ['draw_labels', 'draw_nodes_colorbar', 'edge_cm', 'edge_render_thickness', 'edge_threshold', 'inner_r', 'node_cm', 'nodes', 'start_radian']
     >>> my_circ['nodes']
@@ -299,19 +301,13 @@ def make_circro_from_dir(src_dir, inner_r=1.0, start_radian=0.0, edge_threshold=
     >>> labels_right = pd.Series(['R' + l for l in 'ABC'])
     >>> labels_df = pd.concat([labels_left, labels_right], axis = 1)
     >>> colors_df = sizes_df
-    >>> import shutil
     >>> from test_utils import temp_dir
-    >>> with temp_dir(sizes_df, labels_df, colors_df) as fs:
-    ...     d = os.path.dirname(fs[0])
-    ...     def cp(indx, new_name):
-    ...         dest = os.path.join(d, new_name)
-    ...         shutil.copyfile(fs[indx], dest)
-    ...         return dest
-    ...     sizes = cp(0, 'sizes.csv')
-    ...     labels = cp(1, 'labels.csv')
-    ...     colors = cp(2, 'colors.csv')
-    ...     edges = os.path.join(d, 'edge_matrix.csv')
-    ...     edges_df.to_csv(edges, index = False, header = False)
+    >>> with temp_dir(sizes = sizes_df, labels = labels_df, colors = colors_df, edge_matrix = edges_df) as d:
+    ...     full_path = lambda(s): os.path.join(d, s)
+    ...     sizes = full_path('sizes.csv')
+    ...     labels = full_path('labels.csv')
+    ...     colors = full_path('colors.csv')
+    ...     edges = full_path('edge_matrix.csv')
     ...     my_circ_dir = make_circro_from_dir(d)
     ...     my_circ = make_circro(labels = labels,
     ...         sizes = sizes, colors = colors,
@@ -407,8 +403,9 @@ def _plot_info(circ):
     >>> sizes_right = pd.Series([i for i in range(3)])
     >>> sizes = pd.concat([sizes_left, sizes_right], axis = 1)
     >>> from test_utils import temp_dir
-    >>> with temp_dir(sizes) as fs:
-    ...    my_circ = make_circro(sizes = fs[0])
+    >>> import os
+    >>> with temp_dir(sizes = sizes) as d:
+    ...    my_circ = make_circro(sizes = os.path.join(d, 'sizes.csv'))
     >>> info = _plot_info(my_circ)
     """
     num_nodes = len(circ['nodes']) if 'nodes' in circ else len(circ['edges'])
