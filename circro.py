@@ -30,6 +30,52 @@ def _inputs_to_dict(**kwords):
     return kwords
 
 
+def _lower_mask(mat, selectors = None):
+    """
+    >>> x = np.reshape(np.arange(9), (3, 3))
+    >>> _lower_mask(x)
+    array([[False, False, False],
+           [ True, False, False],
+           [ True,  True, False]], dtype=bool)
+    >>> _lower_mask(x, x != 3)
+    array([[False, False, False],
+           [False, False, False],
+           [ True,  True, False]], dtype=bool)
+    """
+    mask =  np.tril(np.ones(mat.shape, dtype=bool), -1)
+    if selectors is not None:
+        mask = np.logical_and(mask, selectors)
+    return mask
+
+
+def _amin(mat, mask = None):
+    """
+    >>> import numpy as np
+    >>> x = np.array([[1, 2], [5, -3]])
+    >>> _amin(x)
+    -3
+    >>> _amin(x, x > 0)
+    1
+    """
+    if mask is None:
+        mask =  np.ones(mat.shape, dtype=bool)
+    return np.amin(mat[mask])
+
+
+def _amax(mat, mask = None):
+    """
+    >>> import numpy as np
+    >>> x = np.array([[1, 2], [5, -3]])
+    >>> _amax(x)
+    5
+    >>> _amax(x, x < 2)
+    1
+    """
+    if mask is None:
+        mask =  np.ones(mat.shape, dtype=bool)
+    return np.amax(mat[mask])
+
+
 def _scale_matrix(mat, new_min=0, new_max=1, selectors=None):
     """
     Return a scaled version of a matrix
@@ -48,15 +94,29 @@ def _scale_matrix(mat, new_min=0, new_max=1, selectors=None):
     >>> _scale_matrix(x, 4, 8, x!=0)
     array([[ 0.,  4.],
            [ 6.,  8.]])
+    >>> x = np.array([
+    ...    [0, 0, 0, 0],
+    ...    [1, 0, 0, 0],
+    ...    [1, 1, 0, 0],
+    ...    [2, 2, 3, 0]])
+    >>> mask = _lower_mask(x, x < 3)
+    >>> _scale_matrix(x, 4, 8, mask)
+    array([[ 0.,  0.,  0.,  0.],
+           [ 4.,  0.,  0.,  0.],
+           [ 4.,  4.,  0.,  0.],
+           [ 8.,  8.,  3.,  0.]])
     """
     if selectors is None:
         selectors = np.ones(mat.shape) == 1
+    elif not np.any(selectors):
+        return mat
+
     mx = mat[selectors].max()
     mn = mat[selectors].min()
     rg = mx - mn
     new_rg = new_max - new_min
     ratio = new_rg/rg
-    new_mat = mat.astype(float)
+    new_mat = mat.copy().astype(float)
     new_mat[selectors] = (mat[selectors] - mn) * ratio + new_min
     return new_mat
 
@@ -425,8 +485,9 @@ def _plot_info(circ):
 
     node_cm = getattr(cm, circ['node_cm'])
 
-    info['node_colors'] = node_cm(circ['nodes']['colors'] if 'colors' in circ['nodes'] else 1.0)
-    if circ['draw_nodes_colorbar']:
+    has_colors = 'colors' in circ['nodes']
+    info['node_colors'] = node_cm(circ['nodes']['colors'] if has_colors else 1.0)
+    if has_colors and circ['draw_nodes_colorbar']:
         info['node_colors_norm'] = \
             mpl.colors.Normalize(vmin=circ['nodes']['colors'].min().min(),
                                  vmax=circ['nodes']['colors'].max().max())
@@ -451,13 +512,17 @@ def _plot_info(circ):
     info['nodes'] = nodes
 
     if 'edges' in circ:
-        mask = circ['edges'] > circ['edge_threshold']
-        scaled_edges = _scale_matrix(circ['edges'], selectors=mask)
+        edge_vals = circ['edges'].values
+        mask = _lower_mask(edge_vals, edge_vals > circ['edge_threshold'])
+        info['edges_mask'] = mask
+        scaled_edges = _scale_matrix(edge_vals, selectors=mask)
+        scaled_edges = pd.DataFrame(data=scaled_edges, index=circ['edges'].index, columns=circ['edges'].columns)
         edge_cm = getattr(cm, circ['edge_cm'])
+        info['scaled_edges'] = scaled_edges
         info['edge_colors'] = _lazy_df(edge_cm, scaled_edges)
         info['edge_colors_norm'] = mpl.colors.Normalize(
-            vmin=circ['edges'][mask].min().min(),
-            vmax=circ['edges'][mask].max().max()
+            vmin=_amin(edge_vals, mask),
+            vmax=_amax(edge_vals, mask)
         )
 
     return info
@@ -495,27 +560,28 @@ def plot_circro(my_circ, draw=True):
                                   cmap=getattr(cm, my_circ['node_cm']), **params)
 
     if 'edges' in my_circ:
-        edges = my_circ['edges'].T
+        edges = my_circ['edges']
 
         index_to_theta = lambda i: np.deg2rad(nodes.loc[i]['label_loc'])
 
         if my_circ['edge_render_thickness']:
             new_min, new_max = my_circ['edge_render_thickness']
-            edge_thicknesses = _scale_matrix(edges, new_min, new_max,
-                                             edges > my_circ['edge_threshold'])
+            mask = info['edges_mask']
+            edge_thicknesses = _scale_matrix(edges.values, new_min, new_max, mask)
+            edge_thicknesses = pd.DataFrame(edge_thicknesses, index=edges.index, columns=edges.columns)
         else:
             edge_thicknesses = edges
 
-        for start_index in edges:
-            end_edges = edges[start_index][:start_index][:-1]
-            start_theta = index_to_theta(start_index)
-            for end_index in end_edges.index[end_edges > my_circ['edge_threshold']]:
-                end_theta = index_to_theta(end_index)
+        for col_index in edges:
+            col_edges = edges[col_index][col_index:]
+            start_theta = index_to_theta(col_index)
+            for row_index in col_edges.index[col_edges > my_circ['edge_threshold']]:
+                end_theta = index_to_theta(row_index)
                 if start_theta == end_theta:
                     continue
                 (radii, thetas) = _calculate_radial_arc(start_theta, end_theta, inner_r)
-                clr = info['edge_colors'][start_index][end_index]()
-                ax.plot(thetas, radii, color=clr, ls='-', lw=edge_thicknesses[start_index][end_index])
+                clr = info['edge_colors'][col_index][row_index]()
+                ax.plot(thetas, radii, color=clr, ls='-', lw=edge_thicknesses[col_index][row_index])
 
         norm = info['edge_colors_norm']
         ax_color, params = mpl.colorbar.make_axes(ax, location='right')
