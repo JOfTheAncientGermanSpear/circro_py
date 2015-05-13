@@ -2,9 +2,9 @@ import tempfile, shutil, os
 
 def inputs_to_list(*args):
     """
-    >>> inputs_to_list('abc')
+    >>> inputs_to_list(str('abc'))
     ['abc']
-    >>> inputs_to_list('abc', 'bde')
+    >>> inputs_to_list(str('abc'), str('bde'))
     ['abc', 'bde']
     """
     return list(args)
