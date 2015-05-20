@@ -278,7 +278,7 @@ def _raise_input_error(inputs):
 
 
 def make_circro(labels=None, sizes=None, colors=None, edge_matrix=None,
-                inner_r=1.0, start_radian=0.0, edge_threshold=.5, node_cm='jet', edge_cm='jet',
+                inner_r=1.0, start_radian=np.pi/2, edge_threshold=.5, node_cm='jet', edge_cm='jet',
                 draw_labels=True, draw_nodes_colorbar=None, edge_render_thickness=None):
     """
     Generates a circular diagram data structure that contains data to be rendered with
@@ -336,7 +336,7 @@ def make_circro(labels=None, sizes=None, colors=None, edge_matrix=None,
     return res
 
 
-def make_circro_from_dir(src_dir, inner_r=1.0, start_radian=0.0, edge_threshold=.5,
+def make_circro_from_dir(src_dir, inner_r=1.0, start_radian=np.pi/2, edge_threshold=.5,
                          node_cm='jet', edge_cm='jet', draw_labels=True,
                          draw_nodes_colorbar=True, edge_render_thickness=None):
     """
