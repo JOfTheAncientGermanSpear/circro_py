@@ -30,7 +30,7 @@ def _inputs_to_dict(**kwords):
     return kwords
 
 
-def _lower_mask(mat, selectors = None):
+def _lower_mask(mat, selectors=None):
     """
     >>> x = np.reshape(np.arange(9), (3, 3))
     >>> _lower_mask(x)
@@ -42,13 +42,13 @@ def _lower_mask(mat, selectors = None):
            [False, False, False],
            [ True,  True, False]], dtype=bool)
     """
-    mask =  np.tril(np.ones(mat.shape, dtype=bool), -1)
+    mask = np.tril(np.ones(mat.shape, dtype=bool), -1)
     if selectors is not None:
         mask = np.logical_and(mask, selectors)
     return mask
 
 
-def _amin(mat, mask = None):
+def _amin(mat, mask=None):
     """
     >>> import numpy as np
     >>> x = np.array([[1, 2], [5, -3]])
@@ -58,11 +58,11 @@ def _amin(mat, mask = None):
     1
     """
     if mask is None:
-        mask =  np.ones(mat.shape, dtype=bool)
+        mask = np.ones(mat.shape, dtype=bool)
     return np.amin(mat[mask])
 
 
-def _amax(mat, mask = None):
+def _amax(mat, mask=None):
     """
     >>> import numpy as np
     >>> x = np.array([[1, 2], [5, -3]])
@@ -72,7 +72,7 @@ def _amax(mat, mask = None):
     1
     """
     if mask is None:
-        mask =  np.ones(mat.shape, dtype=bool)
+        mask = np.ones(mat.shape, dtype=bool)
     return np.amax(mat[mask])
 
 
@@ -178,8 +178,8 @@ def _prep_node_data(node_data):
     dtype: object
     """
     data = node_data \
-            if isinstance(node_data, pd.core.frame.DataFrame) \
-            else pd.read_csv(node_data)
+        if isinstance(node_data, pd.core.frame.DataFrame) \
+        else pd.read_csv(node_data)
 
     (left, right) = data.columns
     return pd.concat([data[left], data[right]], keys=['left', 'right'])
@@ -226,8 +226,8 @@ def _create_nodes_df(filename_dict):
     """
     node_file_keys = ['labels', 'sizes', 'colors']
     series_dict = {k: f if isinstance(f, pd.core.frame.DataFrame) else _prep_node_data(f)
-            for k, f in filename_dict.items()
-                if f is not None and k in node_file_keys}
+                   for k, f in filename_dict.items()
+                   if f is not None and k in node_file_keys}
     return pd.concat(series_dict.values(), axis=1, keys=series_dict.keys())
 
 
