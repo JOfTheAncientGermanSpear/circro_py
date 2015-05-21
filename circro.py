@@ -481,7 +481,7 @@ def _plot_info(circ):
     nodes['size'] = circ['nodes']['sizes'] if 'sizes' in circ['nodes'] else 1
 
     nodes['width'] = rad_per_node
-    nodes['width'].right = rad_per_node * -1
+    nodes.loc['right', 'width'] = rad_per_node * -1
 
     node_cm = getattr(cm, circ['node_cm'])
 
@@ -496,11 +496,11 @@ def _plot_info(circ):
     nodes['theta'] = nodes['width'] * nodes.index.labels[1]
 
     nodes['label_loc'] = nodes['theta'] * 180/np.pi
-    nodes['label_loc'].right += 360
+    nodes.loc['right', 'label_loc'] = nodes.label_loc.right.values + 360
 
     deg_per_node = np.rad2deg(rad_per_node)
-    nodes['label_loc'].left = nodes['label_loc'].left + deg_per_node/2
-    nodes['label_loc'].right = nodes['label_loc'].right - deg_per_node/2
+    nodes.loc['left', 'label_loc'] = nodes.label_loc.left.values + deg_per_node/2
+    nodes.loc['right', 'label_loc'] = nodes.label_loc.right.values + deg_per_node/2
 
     start_deg = np.rad2deg(start_radian)
     nodes['label_loc'] = nodes['label_loc'] + start_deg
