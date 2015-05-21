@@ -254,14 +254,14 @@ def _create_edges_df(edge_file, left_len, right_len):
     >>> with temp_dir(edge_matrix = edges) as d:
     ...     f = os.path.join(d, 'edge_matrix.csv')
     ...     _create_edges_df(f, 3, 3)
-             left            right          
-                0    1    2      0    1    2
-    left  0   0.0  1.2  1.3    1.4  1.5  1.6
-          1   1.2  0.0  2.3    0.0  0.0  0.0
-          2   1.3  2.3  0.0    0.0  0.0  3.6
-    right 0   1.4  0.0  0.0    0.0  4.5  0.0
-          1   1.5  0.0  0.0    4.5  0.0  0.0
-          2   1.6  0.0  3.6    0.0  0.0  0.0
+            left           right          
+               0    1    2     0    1    2
+    left  0  0.0  1.2  1.3   1.4  1.5  1.6
+          1  1.2  0.0  2.3   0.0  0.0  0.0
+          2  1.3  2.3  0.0   0.0  0.0  3.6
+    right 0  1.4  0.0  0.0   0.0  4.5  0.0
+          1  1.5  0.0  0.0   4.5  0.0  0.0
+          2  1.6  0.0  3.6   0.0  0.0  0.0
     """
     outer_index = ['left']*left_len + ['right']*right_len
     inner_index = range(left_len) + range(right_len)
@@ -500,7 +500,7 @@ def _plot_info(circ):
 
     deg_per_node = np.rad2deg(rad_per_node)
     nodes.loc['left', 'label_loc'] = nodes.label_loc.left.values + deg_per_node/2
-    nodes.loc['right', 'label_loc'] = nodes.label_loc.right.values + deg_per_node/2
+    nodes.loc['right', 'label_loc'] = nodes.label_loc.right.values - deg_per_node/2
 
     start_deg = np.rad2deg(start_radian)
     nodes['label_loc'] = nodes['label_loc'] + start_deg
