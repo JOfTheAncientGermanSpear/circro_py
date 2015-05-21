@@ -528,7 +528,7 @@ def _plot_info(circ):
     return info
 
 
-def plot_circro(my_circ, draw=True):
+def plot_circro(my_circ, draw=True, rc_context=None):
     """
     Renders diagram associated with a circro structure
 
@@ -537,6 +537,11 @@ def plot_circro(my_circ, draw=True):
     my_circ = circro.make_circro_from_dir('test_data')
     plot_circro(my_circ)
     """
+    if rc_context is not None:
+        with plt.rc_context(rc_context):
+            plot_circro(my_circ, draw, None)
+        return
+
     info = _plot_info(my_circ)
     nodes = info['nodes']
 
@@ -592,7 +597,7 @@ def plot_circro(my_circ, draw=True):
         plt.show()
 
 
-def plot_circros(my_circs):
+def plot_circros(my_circs, rc_context=None):
     """
     Renders diagram for a list of circros
 
@@ -602,8 +607,14 @@ def plot_circros(my_circs):
     my_circ2 = make_circro(labels='test_dir/labels.csv', inner_r = 2)
     plot_circros([my_circ, my_circ2])
     """
+    if rc_context is not None:
+        with plt.rc_context(rc_context):
+            plot_circros(my_circs, None)
+        return
+
     for c in my_circs:
         plot_circro(c, draw=False)
+        
     plt.show()
 
 
