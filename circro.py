@@ -105,6 +105,10 @@ def _scale_matrix(mat, new_min=0, new_max=1, selectors=None):
            [ 4.,  0.,  0.,  0.],
            [ 4.,  4.,  0.,  0.],
            [ 8.,  8.,  3.,  0.]])
+    >>> binary = np.array([[1, 0], [1, 0]])
+    >>> _scale_matrix(binary, new_max=2, selectors = binary > 0)
+    array([[ 2.,  0.],
+           [ 2.,  0.]])
     """
     if selectors is None:
         selectors = np.ones(mat.shape) == 1
@@ -113,11 +117,15 @@ def _scale_matrix(mat, new_min=0, new_max=1, selectors=None):
 
     mx = mat[selectors].max()
     mn = mat[selectors].min()
-    rg = mx - mn
-    new_rg = new_max - new_min
-    ratio = new_rg/rg
     new_mat = mat.copy().astype(float)
-    new_mat[selectors] = (mat[selectors] - mn) * ratio + new_min
+
+    new_rg = new_max - new_min
+    rg = mx - mn
+    if rg != 0:
+        ratio = new_rg/rg
+        new_mat[selectors] = (mat[selectors] - mn) * ratio + new_min
+    else:
+        new_mat[selectors] = new_max
     return new_mat
 
 
@@ -520,9 +528,14 @@ def _plot_info(circ):
         edge_cm = getattr(cm, circ['edge_cm'])
         info['scaled_edges'] = scaled_edges
         info['edge_colors'] = _lazy_df(edge_cm, scaled_edges)
+
+        norm_max, norm_min = (1, 0) \
+            if len(np.unique(edge_vals)) <= 2 \
+            else (_amax(edge_vals, mask), _amin(edge_vals, mask))
+
         info['edge_colors_norm'] = mpl.colors.Normalize(
-            vmin=_amin(edge_vals, mask),
-            vmax=_amax(edge_vals, mask)
+            vmin=norm_min,
+            vmax=norm_max
         )
 
     return info
